@@ -63,6 +63,7 @@ const ChatBot = () => {
   const postnatalInFlightRef = useRef<boolean>(false)
   const medicalInFlightRef = useRef<boolean>(false)
   const pendingCardTasksRef = useRef<number>(0)
+  const infoShownRef = useRef<{ postnatal: boolean; medical: boolean }>({ postnatal: false, medical: false })
 
   const isChatBlocked = busyCount > 0
 
@@ -432,6 +433,11 @@ const ChatBot = () => {
                 sender: 'bot',
                 timestamp: new Date()
               }
+              try {
+                const t = String(event.content || '')
+                if (/(산후\s*조리원|조리원)/.test(t)) infoShownRef.current.postnatal = true
+                if (/(의료시설|의료|병원|약국|보건소)/.test(t)) infoShownRef.current.medical = true
+              } catch {}
               setMessages(prev => {
                 const next = [...prev, infoMsg]
                 persistMessages(next, activeSessionId)
@@ -448,6 +454,21 @@ const ChatBot = () => {
             if (action.name === 'postnatal.recommend') {
               disableLocalPostnatalRef.current = true
               ;(async () => {
+                // 안내 버블이 아직 없다면 먼저 추가하여 순서 보장
+                if (!infoShownRef.current.postnatal) {
+                  const infoMsg: Message = {
+                    id: (Date.now() + Math.random()).toString(),
+                    text: '근처 산후조리원 위치를 찾아볼게요',
+                    sender: 'bot',
+                    timestamp: new Date()
+                  }
+                  setMessages(prev => {
+                    const next = [...prev, infoMsg]
+                    persistMessages(next, activeSessionId)
+                    return next
+                  })
+                  infoShownRef.current.postnatal = true
+                }
                 setBusyCount(prev => prev + 1)
                 pendingCardTasksRef.current += 1
                 try {
@@ -459,6 +480,20 @@ const ChatBot = () => {
               })()
             } else if (action.name === 'medical.recommend') {
               ;(async () => {
+                if (!infoShownRef.current.medical) {
+                  const infoMsg: Message = {
+                    id: (Date.now() + Math.random()).toString(),
+                    text: '근처 의료시설을 찾아볼게요',
+                    sender: 'bot',
+                    timestamp: new Date()
+                  }
+                  setMessages(prev => {
+                    const next = [...prev, infoMsg]
+                    persistMessages(next, activeSessionId)
+                    return next
+                  })
+                  infoShownRef.current.medical = true
+                }
                 setBusyCount(prev => prev + 1)
                 pendingCardTasksRef.current += 1
                 try {
