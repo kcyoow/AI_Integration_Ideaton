@@ -1,42 +1,87 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import {
-  Search,
-  MapPin,
-  Phone,
-  Clock,
-  Star,
-  Building2,
-  Pill,
-  Stethoscope,
-  Heart,
-
-} from 'lucide-react'
+import { Search, MapPin, Phone, Building2, Pill, Stethoscope, Heart } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { loadNaverMap } from '../lib/naverMap'
+
+type FacilityType = 'hospital' | 'pharmacy' | 'healthcenter'
+
+interface RawFacility {
+  기관명: string
+  기관종명?: string
+  주소: string
+  전화번호?: string
+  종별: string
+  관리기관?: string
+}
 
 interface Facility {
   id: string
   name: string
-  type: 'hospital' | 'pharmacy' | 'healthcenter'
+  type: FacilityType
   category: string
   address: string
-  phone: string
-  hours: string
-  rating: number
-  distance: string
-  features: string[]
-  coordinates: { lat: number; lng: number }
-  description: string
+  phone?: string
+  manager?: string
+  institutionType?: string
+  coordinates?: { lat: number; lng: number }
+  raw: RawFacility
+}
+
+const MARKER_COLORS: Record<FacilityType, string> = {
+  hospital: '#2563eb',
+  pharmacy: '#059669',
+  healthcenter: '#7c3aed'
+}
+
+const CATEGORY_ORDER = ['종합병원', '병원', '산부인과 의원', '소아과 의원', '보건소', '보건지소', '일반약국']
+
+const normalizeCategory = (value: string) => value.replace(/\s+/g, ' ').trim()
+
+const determineFacilityType = (category: string): FacilityType => {
+  if (category.includes('약국')) return 'pharmacy'
+  if (category.includes('보건')) return 'healthcenter'
+  return 'hospital'
+}
+
+const sortCategories = (categories: string[]) => {
+  const orderMap = new Map(CATEGORY_ORDER.map((value, index) => [value, index]))
+  return [...new Set(categories)].sort((a, b) => {
+    const orderA = orderMap.get(a)
+    const orderB = orderMap.get(b)
+    if (orderA !== undefined && orderB !== undefined) return orderA - orderB
+    if (orderA !== undefined) return -1
+    if (orderB !== undefined) return 1
+    return a.localeCompare(b, 'ko')
+  })
+}
+
+const mapRawFacilityToFacility = (raw: RawFacility, index: number): Facility => {
+  const category = normalizeCategory(raw.종별)
+  const facilityType = determineFacilityType(category)
+
+  return {
+    id: `${facilityType}-${index}`,
+    name: raw.기관명,
+    type: facilityType,
+    category,
+    address: raw.주소,
+    phone: raw.전화번호 && raw.전화번호.trim() !== '' ? raw.전화번호 : undefined,
+    manager: raw.관리기관 && raw.관리기관.trim() !== '' ? raw.관리기관 : undefined,
+    institutionType: raw.기관종명 && raw.기관종명.trim() !== '' ? raw.기관종명 : undefined,
+    raw
+  }
 }
 
 const MedicalFacilities = () => {
   const { auth } = useAuth()
+  const [facilities, setFacilities] = useState<Facility[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [categories, setCategories] = useState<string[]>([])
   const [userLocation, setUserLocation] = useState('안산시 상록구')
   const [mapReady, setMapReady] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
@@ -45,10 +90,15 @@ const MedicalFacilities = () => {
   const [addressResults, setAddressResults] = useState<any[]>([])
   const [isSearchingAddress, setIsSearchingAddress] = useState(false)
   const [addressError, setAddressError] = useState<string | null>(null)
+  const [dataLoaded, setDataLoaded] = useState(false)
   const mapElementRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
-  const markersRef = useRef<any[]>([])
+  const markersRef = useRef<Map<string, any>>(new Map())
   const searchMarkerRef = useRef<any>(null)
+  const infoWindowRef = useRef<any>(null)
+  const geocodeCacheRef = useRef<Map<string, { lat: number; lng: number } | null>>(new Map())
+  const geocodePromisesRef = useRef<Map<string, Promise<{ lat: number; lng: number } | null>>>(new Map())
+  const facilitiesRef = useRef<Facility[]>([])
   const mapSectionRef = useRef<HTMLDivElement | null>(null)
 
   const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_MAP_CLIENT_ID
@@ -60,6 +110,29 @@ const MedicalFacilities = () => {
       setUserLocation(prev => (prev === '' || prev === '안산시 상록구') ? addr : prev)
     }
   }, [auth.address])
+
+  useEffect(() => {
+    const loadFacilities = async () => {
+      try {
+        const url = new URL('../../data/facilities.json', import.meta.url).href
+        const response = await fetch(url)
+        if (!response.ok) {
+          throw new Error(`시설 정보를 불러오지 못했습니다. (status: ${response.status})`)
+        }
+        const data: RawFacility[] = await response.json()
+        const mapped = data.map(mapRawFacilityToFacility)
+        setFacilities(mapped)
+        facilitiesRef.current = mapped
+        setCategories(sortCategories(mapped.map(facility => facility.category)))
+        setDataLoaded(true)
+      } catch (error) {
+        console.error(error)
+        setMapError('시설 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.')
+      }
+    }
+
+    loadFacilities()
+  }, [])
 
   useEffect(() => {
     if (!mapElementRef.current) return
@@ -91,78 +164,212 @@ const MedicalFacilities = () => {
       })
   }, [NAVER_CLIENT_ID])
 
-  const facilities: Facility[] = [
-    {
-      id: '1',
-      name: '안산여성병원',
-      type: 'hospital',
-      category: '산부인과',
-      address: '경기도 안산시 상록구 한대역로 68',
-      phone: '031-419-5500',
-      hours: '월~금 09:00-18:00, 토 09:00-13:00',
-      rating: 4.8,
-      distance: '1.2km',
-      features: ['산전검사', '분만', '산후조리', '소아진료'],
-      coordinates: { lat: 37.3219, lng: 126.8307 },
-      description: '안산시 대표 종합 여성병원으로, 임신부터 육아까지 전 과정을 책임집니다.'
-    },
-    {
-      id: '2',
-      name: '한양대학교병원 안산',
-      type: 'hospital',
-      category: '종합병원',
-      address: '경기도 안산시 상록구 반월동 895',
-      phone: '031-410-6000',
-      hours: '24시간 운영',
-      rating: 4.6,
-      distance: '2.5km',
-      features: ['응급실', '산부인과', '소아청소년과', '신생아중환자실'],
-      coordinates: { lat: 37.3229, lng: 126.8308 },
-      description: '대학병원 수준의 의료 서비스를 제공하는 종합병원입니다.'
-    },
-    {
-      id: '3',
-      name: '새롬약국',
-      type: 'pharmacy',
-      category: '일반약국',
-      address: '경기도 안산시 상록구 한대역로 85',
-      phone: '031-400-1234',
-      hours: '매일 09:00-22:00',
-      rating: 4.5,
-      distance: '0.8km',
-      features: ['24시간', '임신용약', '영유아용약'],
-      coordinates: { lat: 37.3219, lng: 126.8307 },
-      description: '임산부와 영유아 맞춤 약품을 취급하는 약국입니다.'
-    },
-    {
-      id: '4',
-      name: '안산시보건소',
-      type: 'healthcenter',
-      category: '보건소',
-      address: '경기도 안산시 상록구 고잔동 607',
-      phone: '031-480-3114',
-      hours: '월~금 09:00-18:00',
-      rating: 4.3,
-      distance: '3.1km',
-      features: ['무료산전검사', '모성보건사업', '예방접종', '건강상담'],
-      coordinates: { lat: 37.3219, lng: 126.8307 },
-      description: '안산시민을 위한 공공 보건의료 서비스를 제공합니다.'
-    },
-    {
-      id: '5',
-      name: '사랑이아기병원',
-      type: 'hospital',
-      category: '소아과',
-      address: '경기도 안산시 단원구 초지동 555',
-      phone: '031-492-2275',
-      hours: '월~금 09:00-20:00, 토 09:00-15:00',
-      rating: 4.7,
-      distance: '4.2km',
-      features: ['신생아진료', '영유아건강검진', '예방접종', '알레르기진료'],
-      coordinates: { lat: 37.3219, lng: 126.8307 },
-      description: '영유아 전문 소아병원으로, 아이들의 건강을 책임집니다.'
+  const geocodeFacility = useCallback((facility: Facility): Promise<{ lat: number; lng: number } | null> => {
+    if (facility.coordinates) return Promise.resolve(facility.coordinates)
+    if (!mapReady || !window.naver) return Promise.resolve(null)
+
+    const cacheKey = facility.address
+
+    if (geocodeCacheRef.current.has(cacheKey)) {
+      const cached = geocodeCacheRef.current.get(cacheKey) ?? null
+      return Promise.resolve(cached)
     }
-  ]
+
+    const existingPromise = geocodePromisesRef.current.get(cacheKey)
+    if (existingPromise) return existingPromise
+
+    const promise = new Promise<{ lat: number; lng: number } | null>((resolve) => {
+      window.naver.maps.Service.geocode({ query: facility.address }, (status: any, response: any) => {
+        if (status !== window.naver.maps.Service.Status.OK) {
+          geocodeCacheRef.current.set(cacheKey, null)
+          geocodePromisesRef.current.delete(cacheKey)
+          resolve(null)
+          return
+        }
+
+        const addr = response?.v2?.addresses?.[0]
+        if (!addr) {
+          geocodeCacheRef.current.set(cacheKey, null)
+          geocodePromisesRef.current.delete(cacheKey)
+          resolve(null)
+          return
+        }
+
+        const lat = parseFloat(addr.y)
+        const lng = parseFloat(addr.x)
+        if (Number.isNaN(lat) || Number.isNaN(lng)) {
+          geocodeCacheRef.current.set(cacheKey, null)
+          geocodePromisesRef.current.delete(cacheKey)
+          resolve(null)
+          return
+        }
+
+        const coords = { lat, lng }
+        geocodeCacheRef.current.set(cacheKey, coords)
+        geocodePromisesRef.current.delete(cacheKey)
+        setFacilities(prev => prev.map(item => item.id === facility.id ? { ...item, coordinates: coords } : item))
+        resolve(coords)
+      })
+    })
+
+    geocodePromisesRef.current.set(cacheKey, promise)
+    return promise
+  }, [mapReady])
+
+  useEffect(() => {
+    facilitiesRef.current = facilities
+  }, [facilities])
+
+  useEffect(() => {
+    if (!mapReady || !dataLoaded) return
+    if (!window.naver) return
+
+    let cancelled = false
+
+    const run = async () => {
+      for (const facility of facilitiesRef.current) {
+        if (cancelled) break
+        if (facility.coordinates) continue
+        await geocodeFacility(facility)
+        if (cancelled) break
+        await new Promise(resolve => setTimeout(resolve, 120))
+      }
+    }
+
+    run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [mapReady, dataLoaded, geocodeFacility])
+
+  const buildInfoWindowContent = useCallback((facility: Facility) => {
+    return [
+      '<div style="padding:8px 12px; max-width:240px;">',
+      `<strong style="display:block; font-size:14px; margin-bottom:4px; color:#111827;">${facility.name}</strong>`,
+      `<span style="display:block; font-size:12px; color:#4b5563; margin-bottom:2px;">${facility.category}</span>`,
+      `<span style="display:block; font-size:12px; color:#4b5563;">${facility.address}</span>`,
+      facility.phone ? `<span style="display:block; font-size:12px; color:#2563eb; margin-top:4px;">${facility.phone}</span>` : '',
+      '</div>'
+    ].join('')
+  }, [])
+
+  const matchingFacilities = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+
+    return facilities.filter(facility => {
+      const matchesSearch = term === ''
+        || facility.name.toLowerCase().includes(term)
+        || facility.address.toLowerCase().includes(term)
+        || facility.category.toLowerCase().includes(term)
+        || (facility.manager && facility.manager.toLowerCase().includes(term))
+
+      const matchesType = selectedType === 'all' || facility.type === selectedType
+      const matchesCategory = selectedCategory === 'all' || facility.category === selectedCategory
+
+      return matchesSearch && matchesType && matchesCategory
+    })
+  }, [facilities, searchTerm, selectedType, selectedCategory])
+
+  const displayedFacilities = useMemo(() => {
+    if (selectedCategory !== 'all') {
+      return matchingFacilities.slice(0, 6)
+    }
+
+    return matchingFacilities.slice(0, 6)
+  }, [matchingFacilities, selectedCategory])
+
+  const updateMarkers = useCallback(() => {
+    const map = mapInstanceRef.current
+    if (!map || !window.naver) return
+
+    const bounds = typeof map.getBounds === 'function' ? map.getBounds() : null
+    const markerMap = markersRef.current
+    const visibleIds = new Set<string>()
+
+    if (!infoWindowRef.current) {
+      infoWindowRef.current = new window.naver.maps.InfoWindow({ anchorSkew: true, maxWidth: 260 })
+    }
+
+    matchingFacilities.forEach(facility => {
+      if (!facility.coordinates) {
+        void geocodeFacility(facility)
+        return
+      }
+
+      const position = new window.naver.maps.LatLng(facility.coordinates.lat, facility.coordinates.lng)
+      if (bounds && !bounds.hasPoint(position)) {
+        return
+      }
+
+      visibleIds.add(facility.id)
+
+      if (!markerMap.has(facility.id)) {
+        const marker = new window.naver.maps.Marker({
+          position,
+          map,
+          title: facility.name,
+          icon: {
+            content: [
+              '<div style="position: relative; width: 24px; height: 24px; transform: translate(-50%, -100%);">',
+              `  <div style="width: 14px; height: 14px; margin: 0 auto; background-color: ${MARKER_COLORS[facility.type]}; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.25);"></div>`,
+              `  <div style="position: absolute; left: 50%; top: 12px; width: 0; height: 0; transform: translateX(-50%); border: 7px solid transparent; border-top-color: ${MARKER_COLORS[facility.type]};"></div>`,
+              '</div>'
+            ].join(''),
+            anchor: new window.naver.maps.Point(12, 24)
+          }
+        })
+
+        window.naver.maps.Event.addListener(marker, 'click', () => {
+          if (!infoWindowRef.current) return
+          const content = buildInfoWindowContent(facility)
+          infoWindowRef.current.setContent(content)
+          infoWindowRef.current.open(map, marker)
+        })
+
+        markerMap.set(facility.id, marker)
+      } else {
+        const marker = markerMap.get(facility.id)
+        marker.setPosition(position)
+        if (!marker.getMap()) {
+          marker.setMap(map)
+        }
+      }
+    })
+
+    const removeIds: string[] = []
+    markerMap.forEach((marker, id) => {
+      if (!visibleIds.has(id)) {
+        marker.setMap(null)
+        window.naver.maps.Event.clearInstanceListeners(marker)
+        removeIds.push(id)
+      }
+    })
+
+    removeIds.forEach(id => markerMap.delete(id))
+  }, [matchingFacilities, geocodeFacility, buildInfoWindowContent])
+
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || !window.naver) return
+
+    updateMarkers()
+
+    const listener = window.naver.maps.Event.addListener(mapInstanceRef.current, 'idle', () => {
+      updateMarkers()
+    })
+
+    return () => {
+      window.naver.maps.Event.removeListener(listener)
+      markersRef.current.forEach(marker => {
+        marker.setMap(null)
+        window.naver.maps.Event.clearInstanceListeners(marker)
+      })
+      markersRef.current.clear()
+      if (infoWindowRef.current) {
+        infoWindowRef.current.close()
+      }
+    }
+  }, [mapReady, updateMarkers])
 
   const facilityTypes = [
     { id: 'all', name: '전체', icon: Heart },
@@ -171,36 +378,18 @@ const MedicalFacilities = () => {
     { id: 'healthcenter', name: '보건소', icon: Stethoscope }
   ]
 
-  const categories = [
-    '전체', '산부인과', '소아과', '종합병원', '일반약국', '보건소'
-  ]
-
-  const filteredFacilities = facilities.filter(facility => {
-    const matchesSearch = facility.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      facility.address.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = selectedType === 'all' || facility.type === selectedType
-    const matchesCategory = selectedCategory === 'all' || facility.category === selectedCategory
-
-    return matchesSearch && matchesType && matchesCategory
-  })
+  const categoryOptions = useMemo(() => ['전체', ...categories], [categories])
 
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.naver) return
-
-    markersRef.current.forEach(marker => marker.setMap(null))
-    markersRef.current = []
 
     if (searchMarkerRef.current) {
       const markerPosition = searchMarkerRef.current.getPosition()
       if (markerPosition) {
         mapInstanceRef.current.setCenter(markerPosition)
       }
-    } else {
-      const center = new window.naver.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
-      mapInstanceRef.current.setCenter(center)
-      mapInstanceRef.current.setZoom(16)
     }
-  }, [filteredFacilities, mapReady])
+  }, [mapReady])
 
   // 로그인 상태라면, 회원가입 시 입력한 주소를 기본 중심으로 이동
   useEffect(() => {
@@ -252,8 +441,12 @@ const MedicalFacilities = () => {
 
       // 표시용 현재 위치 텍스트도 동기화
       setUserLocation(addr.roadAddress || addr.jibunAddress || query)
+
+      setTimeout(() => {
+        updateMarkers()
+      }, 450)
     })
-  }, [auth.userId, auth.address, mapReady])
+  }, [auth.userId, auth.address, mapReady, updateMarkers])
 
   const openAddressModal = () => {
     setAddressQuery('')
@@ -357,6 +550,10 @@ const MedicalFacilities = () => {
     }
 
     setIsAddressModalOpen(false)
+
+    setTimeout(() => {
+      updateMarkers()
+    }, 450)
   }
 
   const getFacilityIcon = (type: string) => {
@@ -377,15 +574,39 @@ const MedicalFacilities = () => {
     }
   }
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-          }`}
-      />
-    ))
-  }
+  const focusOnFacility = useCallback(async (facility: Facility) => {
+    if (!mapInstanceRef.current || !window.naver) return
+
+    const coords = facility.coordinates ?? await geocodeFacility(facility)
+    if (!coords) return
+
+    const map = mapInstanceRef.current
+    const position = new window.naver.maps.LatLng(coords.lat, coords.lng)
+    const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : 16
+    const targetZoom = currentZoom < 16 ? 16 : currentZoom
+
+    if (typeof map.morph === 'function') {
+      map.morph(position, targetZoom, { duration: 400 })
+    } else {
+      map.setCenter(position)
+      map.setZoom(targetZoom)
+    }
+
+    if (typeof window !== 'undefined' && mapSectionRef.current) {
+      const rect = mapSectionRef.current.getBoundingClientRect()
+      const target = window.scrollY + rect.top - 120
+      window.scrollTo({ top: target < 0 ? 0 : target, behavior: 'smooth' })
+    }
+
+    setTimeout(() => {
+      updateMarkers()
+      const marker = markersRef.current.get(facility.id)
+      if (marker && infoWindowRef.current) {
+        infoWindowRef.current.setContent(buildInfoWindowContent(facility))
+        infoWindowRef.current.open(mapInstanceRef.current, marker)
+      }
+    }, 450)
+  }, [geocodeFacility, updateMarkers, buildInfoWindowContent])
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -480,7 +701,7 @@ const MedicalFacilities = () => {
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">진료과목</h3>
               <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
+                {categoryOptions.map((category) => (
                   <motion.button
                     key={category}
                     whileHover={{ scale: 1.05 }}
@@ -502,7 +723,7 @@ const MedicalFacilities = () => {
 
         {/* Facilities List */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredFacilities.map((facility, index) => (
+          {displayedFacilities.map((facility, index) => (
             <motion.div
               key={facility.id}
               initial={{ opacity: 0, y: 20 }}
@@ -520,50 +741,36 @@ const MedicalFacilities = () => {
                       {facility.name}
                     </h3>
                     <p className="text-sm text-gray-600">{facility.category}</p>
+                    {facility.institutionType && facility.institutionType !== facility.category && (
+                      <p className="text-xs text-gray-500 mt-1">{facility.institutionType}</p>
+                    )}
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="flex items-center space-x-1 mb-1">
-                    {renderStars(facility.rating)}
-                  </div>
-                  <p className="text-sm text-gray-600">{facility.rating}</p>
                 </div>
               </div>
-
-              <p className="text-gray-600 mb-4 text-sm">
-                {facility.description}
-              </p>
 
               <div className="space-y-3 mb-4">
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 text-primary-500" />
+                <div className="flex items-start space-x-2 text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 text-primary-500 mt-0.5" />
                   <span>{facility.address}</span>
-                  <span className="text-primary-600 font-medium">({facility.distance})</span>
                 </div>
 
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Phone className="h-4 w-4 text-primary-500" />
-                  <span>{facility.phone}</span>
-                </div>
+                {facility.phone && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <Phone className="h-4 w-4 text-primary-500" />
+                    <span>{facility.phone}</span>
+                  </div>
+                )}
 
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Clock className="h-4 w-4 text-primary-500" />
-                  <span>{facility.hours}</span>
-                </div>
-              </div>
+                {facility.manager && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <Building2 className="h-4 w-4 text-primary-500" />
+                    <span>{facility.manager}</span>
+                  </div>
+                )}
 
-              <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">주요 서비스</p>
-                <div className="flex flex-wrap gap-2">
-                  {facility.features.map((feature, featureIndex) => (
-                    <span
-                      key={featureIndex}
-                      className="px-2 py-1 bg-primary-50 text-primary-600 rounded text-xs"
-                    >
-                      {feature}
-                    </span>
-                  ))}
-                </div>
+                {!facility.coordinates && (
+                  <p className="text-xs text-gray-400">지도 위치를 준비하는 중입니다.</p>
+                )}
               </div>
 
               <div className="flex space-x-2">
@@ -571,27 +778,31 @@ const MedicalFacilities = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'tween', duration: 0.15 }}
+                  onClick={() => focusOnFacility(facility)}
                   className="flex-1 btn-primary text-sm py-2"
                 >
                   <MapPin className="inline-block h-4 w-4 mr-1" />
-                  지도 보기
+                  지도 이동
                 </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'tween', duration: 0.15 }}
-                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-150"
-                >
-                  <Phone className="inline-block h-4 w-4 mr-1" />
-                  전화하기
-                </motion.button>
+                {facility.phone && (
+                  <motion.a
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: 'tween', duration: 0.15 }}
+                    href={`tel:${facility.phone.replace(/[^0-9]/g, '') || facility.phone}`}
+                    className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-150 text-center"
+                  >
+                    <Phone className="inline-block h-4 w-4 mr-1" />
+                    전화하기
+                  </motion.a>
+                )}
               </div>
             </motion.div>
           ))}
         </div>
 
         {/* Empty State */}
-        {filteredFacilities.length === 0 && (
+        {matchingFacilities.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
