@@ -68,7 +68,7 @@ const ChatBot = () => {
   const suppressCurrentReplyRef = useRef<boolean>(false)
   const loginGateShownRef = useRef<{ postnatal: boolean; medical: boolean }>({ postnatal: false, medical: false })
 
-  const isChatBlocked = busyCount > 0
+  const isChatBlocked = busyCount > 0 && !suppressCurrentReplyRef.current
 
   useEffect(() => {
     currentSessionRef.current = currentSessionId
@@ -519,6 +519,10 @@ const ChatBot = () => {
               // 의도 감지 시 이번 턴의 모델 답변은 차단하고 형식적 답변만
               suppressCurrentReplyRef.current = true
               disableLocalPostnatalRef.current = true
+              // 차단 직후 타이핑 애니메이션/입력 잠금 해제
+              setIsTyping(false)
+              setTypingSessionId(null)
+              setBusyCount(prev => Math.max(0, prev - 1))
               ;(async () => {
                 // 안내 버블이 아직 없다면 먼저 추가하여 순서 보장
                 if (auth.userId && !infoShownRef.current.postnatal) {
@@ -546,6 +550,10 @@ const ChatBot = () => {
               })()
             } else if (action.name === 'medical.recommend') {
               suppressCurrentReplyRef.current = true
+              // 차단 직후 타이핑 애니메이션/입력 잠금 해제
+              setIsTyping(false)
+              setTypingSessionId(null)
+              setBusyCount(prev => Math.max(0, prev - 1))
               ;(async () => {
                 if (auth.userId && !infoShownRef.current.medical) {
                   const infoMsg: Message = {
@@ -651,6 +659,11 @@ const ChatBot = () => {
         if (currentSessionRef.current !== activeSessionId) return
         // 이번 턴 모델 답변 차단(형식 답변만) — 위치 의도일 때만
         suppressCurrentReplyRef.current = true
+        // 차단 직후 타이핑 애니메이션/입력 잠금 해제
+        setIsTyping(false)
+        setTypingSessionId(null)
+        setBusyCount(prev => Math.max(0, prev - 1))
+        // 카드 로딩을 위한 Busy 카운트는 별도로 증가
         setBusyCount(prev => prev + 1)
         pendingCardTasksRef.current += 1
         try {
