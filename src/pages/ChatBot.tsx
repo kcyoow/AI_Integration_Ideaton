@@ -64,6 +64,7 @@ const ChatBot = () => {
   const medicalInFlightRef = useRef<boolean>(false)
   const pendingCardTasksRef = useRef<number>(0)
   const infoShownRef = useRef<{ postnatal: boolean; medical: boolean }>({ postnatal: false, medical: false })
+  const recentCardsRef = useRef<'postnatal' | 'medical' | null>(null)
 
   const isChatBlocked = busyCount > 0
 
@@ -225,6 +226,7 @@ const ChatBot = () => {
       persistMessages(next, activeSessionId)
       return next
     })
+    recentCardsRef.current = 'postnatal'
     } finally {
       postnatalInFlightRef.current = false
     }
@@ -307,6 +309,7 @@ const ChatBot = () => {
       persistMessages(next, activeSessionId)
       return next
     })
+    recentCardsRef.current = 'medical'
     } finally {
       medicalInFlightRef.current = false
     }
@@ -548,7 +551,8 @@ const ChatBot = () => {
           if (currentSessionRef.current === activeSessionId && !botMsgId) {
             const newId = (Date.now() + 1).toString()
             botMsgId = newId
-            const newMsg: Message = { id: newId, text: assembled, sender: 'bot', timestamp: new Date() }
+            const finalText = tailorPostResultText(assembled)
+            const newMsg: Message = { id: newId, text: finalText, sender: 'bot', timestamp: new Date() }
             setMessages(prev => {
               const next = [...prev, newMsg]
               persistMessages(next, activeSessionId)
@@ -556,8 +560,9 @@ const ChatBot = () => {
             })
           }
         } else {
+          const finalText = tailorPostResultText(assembled)
           setMessages(prev => {
-            const next = prev.map(m => m.id === botMsgId ? { ...m, text: assembled } : m)
+            const next = prev.map(m => m.id === botMsgId ? { ...m, text: finalText } : m)
             persistMessages(next, activeSessionId)
             return next
           })
@@ -658,6 +663,28 @@ const ChatBot = () => {
         ? [...renderInline(line), <br key={`br-${keySeq++}`} />]
         : renderInline(line)
     ))
+  }
+
+  const tailorPostResultText = (text: string): string => {
+    let out = String(text || '')
+    const kind = recentCardsRef.current
+    if (!kind) return out
+    // 부정/불가 문구를 사후 안내 문구로 치환
+    const negativePatterns = [
+      /주소나\s*구체적인\s*위치\s*정보는\s*제공할\s*수\s*없습니다[\s\S]*?(?=\n|$)/gi,
+      /위치\s*정보는\s*제공이\s*어렵습니다[\s\S]*?(?=\n|$)/gi,
+      /지역별로\s*차이가\s*있으므로[\s\S]*?(?=\n|$)/gi
+    ]
+    for (const re of negativePatterns) out = out.replace(re, '')
+    const tail = kind === 'postnatal'
+      ? '위 추천 결과를 참고하시고, 최신 정보 및 예약은 각 기관 또는 보건소/병원 홈페이지에서 확인해 주세요.'
+      : '위 추천 결과를 참고하시고, 최신 정보 및 진료 가능 여부는 해당 의료기관 또는 보건소/병원 홈페이지에서 확인해 주세요.'
+    // 본문 끝에 사후 안내를 덧붙이되 중복 방지
+    if (!out.trim().endsWith(tail)) {
+      out = (out.trim() ? out.trim() + '\n\n' : '') + tail
+    }
+    recentCardsRef.current = null
+    return out
   }
 
   return (
