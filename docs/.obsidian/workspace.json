@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "버그 픽스.md",
+                "file": "login 기능.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "버그 픽스"
+              "title": "login 기능"
             }
           }
         ]
@@ -171,6 +171,6 @@
   },
   "active": "9fbd03cc3d49f5ab",
   "lastOpenFiles": [
-    "버그 픽스.md"
+    "login 기능.md"
   ]
 }
