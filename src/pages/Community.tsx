@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import {
   Search,
   Plus,
@@ -285,8 +286,8 @@ const normalizeStoredQuestion = (question: any): Question | null => {
 
   const comments = Array.isArray(question.comments)
     ? question.comments
-        .map((comment: any) => normalizeStoredComment(normalizedId, comment))
-        .filter((comment): comment is Comment => comment !== null)
+      .map((comment: any) => normalizeStoredComment(normalizedId, comment))
+      .filter((comment: Comment | null): comment is Comment => comment !== null)
     : []
 
   const tags = Array.isArray(question.tags)
@@ -321,6 +322,64 @@ const Community = () => {
   const [questions, setQuestions] = useState<Question[]>(defaultQuestions)
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
   const [newComment, setNewComment] = useState<NewCommentFormState>(() => createEmptyCommentForm())
+  const [userLikes, setUserLikes] = useState<Record<string, boolean>>({})
+
+  const LIKE_STORAGE_PREFIX = 'communityLikes:'
+  const likesStorageKey = auth.userId ? `${LIKE_STORAGE_PREFIX}${auth.userId}` : ''
+
+  useEffect(() => {
+    // 사용자 변경 시 좋아요 상태 로드/초기화
+    if (!auth.userId) {
+      setUserLikes({})
+      return
+    }
+    try {
+      const raw = localStorage.getItem(likesStorageKey)
+      setUserLikes(raw ? JSON.parse(raw) : {})
+    } catch {
+      setUserLikes({})
+    }
+  }, [auth.userId])
+
+  const saveUserLikes = (next: Record<string, boolean>) => {
+    if (!auth.userId) return
+    try {
+      localStorage.setItem(likesStorageKey, JSON.stringify(next))
+    } catch { }
+  }
+
+  const getDisplayLikes = (question: Question) => {
+    const base = typeof question.likes === 'number' ? question.likes : 0
+    return base + (userLikes[question.id] ? 1 : 0)
+  }
+
+  const toggleLike = (questionId: string) => {
+    if (!auth.userId) return
+    setUserLikes(prev => {
+      const next = { ...prev }
+      if (next[questionId]) {
+        delete next[questionId]
+      } else {
+        next[questionId] = true
+      }
+      saveUserLikes(next)
+      return next
+    })
+  }
+
+  // 모달 열릴 때 배경 스크롤 잠금
+  useEffect(() => {
+    const open = isQuestionModalOpen || isQuestionDetailOpen
+    const prev = document.body.style.overflow
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = prev || ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isQuestionModalOpen, isQuestionDetailOpen])
 
   useEffect(() => {
     try {
@@ -375,7 +434,7 @@ const Community = () => {
         case 'latest':
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         case 'popular':
-          return b.likes - a.likes
+          return getDisplayLikes(b) - getDisplayLikes(a)
         case 'unanswered':
           return a.comments.length - b.comments.length
         case 'points':
@@ -384,7 +443,7 @@ const Community = () => {
           return 0
       }
     })
-  }, [questions, searchTerm, selectedCategory, sortBy])
+  }, [questions, searchTerm, selectedCategory, sortBy, userLikes])
 
   const getStatusColor = (status: Question['status'], hasAccepted: boolean, commentCount: number) => {
     if (hasAccepted || commentCount > 0 || status === 'answered') return 'bg-green-100 text-green-800'
@@ -602,9 +661,8 @@ const Community = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors duration-150 ${
-                      active ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors duration-150 ${active ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                   >
                     <Icon className="h-3 w-3" />
                     <span>{category.name}</span>
@@ -695,10 +753,22 @@ const Community = () => {
                         <MessageCircle className="h-4 w-4" />
                         <span>{question.comments.length}</span>
                       </div>
-                      <div className="flex items-center space-x-1 text-gray-500">
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: auth.userId ? 1.05 : 1 }}
+                        whileTap={{ scale: auth.userId ? 0.9 : 1 }}
+                        animate={userLikes[question.id] ? { scale: [1, 1.2, 1] } : undefined}
+                        transition={{ type: 'spring', stiffness: 500, damping: 20, duration: 0.2 }}
+                        onClick={(event) => { event.stopPropagation(); toggleLike(question.id) }}
+                        disabled={!auth.userId}
+                        aria-pressed={!!userLikes[question.id]}
+                        className={`relative flex items-center space-x-1 px-2 py-1 rounded-full ${userLikes[question.id] ? 'text-primary-700 bg-primary-50' : 'text-gray-500'
+                          } ${!auth.userId ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary-600 hover:bg-primary-50/60'}`}
+                        title={auth.userId ? (userLikes[question.id] ? '추천 취소' : '추천하기') : '로그인 후 이용 가능'}
+                      >
                         <ThumbsUp className="h-4 w-4" />
-                        <span>{question.likes}</span>
-                      </div>
+                        <span className={`text-sm ${userLikes[question.id] ? 'font-semibold' : ''}`}>{getDisplayLikes(question)}</span>
+                      </motion.button>
                     </div>
                   </div>
                 </div>
@@ -880,184 +950,193 @@ const Community = () => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isQuestionDetailOpen && selectedQuestion && (
+      {isQuestionDetailOpen && selectedQuestion && typeof document !== 'undefined' && createPortal(
+        <motion.div
+          className="fixed inset-0 z-50 overflow-y-auto"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
           <motion.div
-            className="fixed inset-0 z-50 overflow-y-auto"
+            className="absolute inset-0 bg-black/40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-          >
+            onClick={handleCloseQuestionDetail}
+          />
+          <div className="flex min-h-full items-center justify-center p-4">
             <motion.div
-              className="absolute inset-0 bg-black/40"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleCloseQuestionDetail}
-            />
-            <div className="flex min-h-full items-center justify-center p-4">
-              <motion.div
-                className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ type: 'spring', stiffness: 240, damping: 24 }}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 text-xs font-semibold text-primary-700 bg-primary-100 rounded-full">
-                        {selectedQuestion.category}
-                      </span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(selectedQuestion.status, selectedQuestion.hasAcceptedAnswer, selectedQuestion.comments.length)}`}>
-                        {getStatusText(selectedQuestion.status, selectedQuestion.hasAcceptedAnswer, selectedQuestion.comments.length)}
-                      </span>
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900">{selectedQuestion.title}</h2>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {selectedQuestion.author}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {selectedQuestion.createdAt}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MessageCircle className="h-4 w-4" />
-                        {selectedQuestion.comments.length}
-                      </span>
-                    </div>
+              className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 240, damping: 24 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 text-xs font-semibold text-primary-700 bg-primary-100 rounded-full">
+                      {selectedQuestion.category}
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(selectedQuestion.status, selectedQuestion.hasAcceptedAnswer, selectedQuestion.comments.length)}`}>
+                      {getStatusText(selectedQuestion.status, selectedQuestion.hasAcceptedAnswer, selectedQuestion.comments.length)}
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCloseQuestionDetail}
-                    className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                    aria-label="질문 상세 창 닫기"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                  <h2 className="text-2xl font-bold text-gray-900">{selectedQuestion.title}</h2>
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      {selectedQuestion.author}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {selectedQuestion.createdAt}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="h-4 w-4" />
+                      {selectedQuestion.comments.length}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseQuestionDetail}
+                  className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="질문 상세 창 닫기"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-6 mb-8 space-y-4">
+                <div className="text-gray-700 leading-relaxed whitespace-pre-line">
+                  {selectedQuestion.content}
                 </div>
 
-                <div className="mt-6 mb-8 space-y-4">
-                  <div className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {selectedQuestion.content}
+                {selectedQuestion.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedQuestion.tags.map((tag, index) => (
+                      <span
+                        key={`${tag}-${index}`}
+                        className="px-3 py-1 text-xs font-medium text-primary-700 bg-primary-50 rounded-full"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
+                )}
+              </div>
 
-                  {selectedQuestion.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedQuestion.tags.map((tag, index) => (
-                        <span
-                          key={`${tag}-${index}`}
-                          className="px-3 py-1 text-xs font-medium text-primary-700 bg-primary-50 rounded-full"
+              <div className="border-t border-gray-200 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  댓글
+                  <span className="text-sm text-gray-500">{selectedQuestion.comments.length}</span>
+                </h3>
+
+                <div className="mt-4 space-y-4 max-h-72 overflow-y-auto pr-1">
+                  {selectedQuestion.comments.length === 0 ? (
+                    <p className="text-sm text-gray-500">첫 댓글을 남겨보세요.</p>
+                  ) : (
+                    selectedQuestion.comments.map((comment: Comment, index: number) => {
+                      const date = new Date(comment.createdAt)
+                      const formatted = Number.isNaN(date.getTime())
+                        ? comment.createdAt
+                        : date.toLocaleString()
+                      const isAccepted = Boolean(selectedQuestion.hasAcceptedAnswer) && index === 0
+
+                      return (
+                        <div
+                          key={comment.id}
+                          className={`rounded-xl p-4 border ${isAccepted ? 'border-green-300 bg-green-50/60' : 'border-gray-200'}`}
                         >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                              <Users className="h-4 w-4 text-primary-500" />
+                              <span>{comment.author}</span>
+                              {isAccepted && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                                  <CheckCircle className="h-3 w-3" />
+                                  작성자 채택
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-400">{formatted}</span>
+                          </div>
+                          <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                            {comment.content}
+                          </p>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
 
-                <div className="border-t border-gray-200 pt-6 mt-6">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5" />
-                    댓글
-                    <span className="text-sm text-gray-500">{selectedQuestion.comments.length}</span>
-                  </h3>
-
-                  <div className="mt-4 space-y-4 max-h-72 overflow-y-auto pr-1">
-                    {selectedQuestion.comments.length === 0 ? (
-                      <p className="text-sm text-gray-500">첫 댓글을 남겨보세요.</p>
-                    ) : (
-                      selectedQuestion.comments.map(comment => {
-                        const date = new Date(comment.createdAt)
-                        const formatted = Number.isNaN(date.getTime())
-                          ? comment.createdAt
-                          : date.toLocaleString()
-
-                        return (
-                          <div key={comment.id} className="border border-gray-200 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <Users className="h-4 w-4 text-primary-500" />
-                                <span>{comment.author}</span>
-                              </div>
-                              <span className="text-xs text-gray-400">{formatted}</span>
-                            </div>
-                            <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
-                              {comment.content}
-                            </p>
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
-
-                  <form onSubmit={handleCommentSubmit} className="mt-6 space-y-3">
-                    <div className="grid gap-3 md:grid-cols-[2fr_auto] md:items-end">
-                      <div>
-                        <label htmlFor="comment-author" className="block text-xs font-semibold text-gray-700">작성자</label>
-                        <input
-                          id="comment-author"
-                          type="text"
-                          value={newComment.author}
-                          onChange={(event) => setNewComment(prev => ({
-                            ...prev,
-                            author: event.target.value,
-                            isAnonymous: false
-                          }))}
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-primary-500"
-                          placeholder="닉네임을 입력하세요"
-                          disabled={newComment.isAnonymous}
-                        />
-                      </div>
-
-                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={newComment.isAnonymous}
-                          onChange={(event) => setNewComment(prev => ({
-                            ...prev,
-                            isAnonymous: event.target.checked,
-                            author: event.target.checked
-                              ? '익명맘'
-                              : (auth.nickname || auth.name || '')
-                          }))}
-                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                        />
-                        익명으로 댓글 남기기
-                      </label>
-                    </div>
-
+                <form onSubmit={handleCommentSubmit} className="mt-6 space-y-3">
+                  <div className="flex items-start gap-3">
                     <div>
-                      <label htmlFor="comment-content" className="block text-xs font-semibold text-gray-700">댓글 내용</label>
-                      <textarea
-                        id="comment-content"
-                        value={newComment.content}
-                        onChange={(event) => setNewComment(prev => ({ ...prev, content: event.target.value }))}
-                        rows={3}
-                        required
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-primary-500"
-                        placeholder="질문자에게 도움이 될 답변이나 경험을 공유해 주세요"
+                      <label htmlFor="comment-author" className="block text-xs font-semibold text-gray-700">작성자</label>
+                      <input
+                        id="comment-author"
+                        type="text"
+                        value={newComment.author}
+                        onChange={(event) => setNewComment(prev => ({
+                          ...prev,
+                          author: event.target.value,
+                          isAnonymous: false
+                        }))}
+                        className="mt-1 w-44 md:w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-primary-500"
+                        placeholder="닉네임을 입력하세요"
+                        disabled={newComment.isAnonymous}
                       />
                     </div>
 
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        className="btn-primary px-4 py-2 text-sm font-semibold"
-                      >
-                        댓글 등록
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 self-start mt-6">
+                      <input
+                        type="checkbox"
+                        checked={newComment.isAnonymous}
+                        onChange={(event) => setNewComment(prev => ({
+                          ...prev,
+                          isAnonymous: event.target.checked,
+                          author: event.target.checked
+                            ? '익명맘'
+                            : (auth.nickname || auth.name || '')
+                        }))}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      익명
+                    </label>
+                  </div>
+
+                  <div>
+                    <label htmlFor="comment-content" className="block text-xs font-semibold text-gray-700">댓글 내용</label>
+                    <textarea
+                      id="comment-content"
+                      value={newComment.content}
+                      onChange={(event) => setNewComment(prev => ({ ...prev, content: event.target.value }))}
+                      rows={3}
+                      required
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-primary-500"
+                      placeholder="질문자에게 도움이 될 답변이나 경험을 공유해 주세요"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      className="btn-primary px-4 py-2 text-sm font-semibold"
+                    >
+                      댓글 등록
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>,
+        document.body
+      )}
     </div>
   )
 }
