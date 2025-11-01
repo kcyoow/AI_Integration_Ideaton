@@ -413,15 +413,33 @@ const ChatBot = () => {
     ;(async () => {
       setBusyCount(prev => prev + 1)
       let assembled = ''
+      let modelStarted = false
       try {
         let contentStarted = false
         for await (const event of streamChat(history)) {
           if (currentSessionRef.current !== activeSessionId) break
 
-          if (event.type === 'token') {
+          if (event.type === 'start') {
+            modelStarted = true
+          } else if (event.type === 'token') {
             assembled += event.content
           } else if (event.type === 'message') {
-            assembled += (assembled ? '\n\n' : '') + event.content
+            if (!modelStarted) {
+              // 모델 시작 전 서버가 보낸 안내 메시지는 즉시 별도 버블로 노출
+              const infoMsg: Message = {
+                id: (Date.now() + Math.random()).toString(),
+                text: event.content,
+                sender: 'bot',
+                timestamp: new Date()
+              }
+              setMessages(prev => {
+                const next = [...prev, infoMsg]
+                persistMessages(next, activeSessionId)
+                return next
+              })
+            } else {
+              assembled += (assembled ? '\n\n' : '') + event.content
+            }
           } else if (event.type === 'suggestions') {
             const sug = event.suggestions.map(s => `• ${s}`).join('\n')
             assembled += (assembled ? '\n\n' : '') + sug
