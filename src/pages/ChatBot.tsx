@@ -25,7 +25,7 @@ const ChatBot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '안녕하세요! 안산맘케어 AI 의학상담 봇입니다. 임신과 출산에 관한 모든 질문에 답변해 드립니다. 무엇이 궁금하신가요?',
+      text: '안녕하세요! 안산맘케어 AI 챗봇 상담입니다. 임신과 출산에 관한 모든 질문에 답변해 드립니다. 무엇이 궁금하신가요?',
       sender: 'bot',
       timestamp: new Date(),
       category: '인사'
@@ -33,10 +33,14 @@ const ChatBot = () => {
   ])
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!messagesContainerRef.current) return
+    messagesContainerRef.current.scrollTo({
+      top: messagesContainerRef.current.scrollHeight,
+      behavior: 'smooth'
+    })
   }
 
   useEffect(() => {
@@ -46,11 +50,34 @@ const ChatBot = () => {
   const suggestedQuestions = [
     '임신 초기 주의사항이 궁금해요',
     '태교는 어떻게 하나요?',
-    '임신 중 영양제는 어떤 것을 먹어야 할까요?',
-    '출산 준비물은 무엇이 필요한가요?',
-    '모유 수유에 대해 알려주세요',
-    '产后조리 기간은 얼마나 되나요?'
+    '임신 중 영양제는 어떤 것을 먹어야 할까요?'
   ]
+
+  const addMessage = (text: string) => {
+    if (text.trim() === '') return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text,
+      sender: 'user',
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setIsTyping(true)
+
+    setTimeout(() => {
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: generateBotResponse(text),
+        sender: 'bot',
+        timestamp: new Date(),
+        category: '의학정보'
+      }
+      setMessages(prev => [...prev, botMessage])
+      setIsTyping(false)
+    }, 1500)
+  }
 
   const generateBotResponse = (userMessage: string): string => {
     const lowerMessage = userMessage.toLowerCase()
@@ -77,32 +104,12 @@ const ChatBot = () => {
   const handleSendMessage = () => {
     if (inputText.trim() === '') return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: 'user',
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
+    addMessage(inputText)
     setInputText('')
-    setIsTyping(true)
-
-    setTimeout(() => {
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: generateBotResponse(inputText),
-        sender: 'bot',
-        timestamp: new Date(),
-        category: '의학정보'
-      }
-      setMessages(prev => [...prev, botMessage])
-      setIsTyping(false)
-    }, 1500)
   }
 
   const handleSuggestedQuestion = (question: string) => {
-    setInputText(question)
+    addMessage(question)
   }
 
   const formatTime = (date: Date) => {
@@ -128,14 +135,16 @@ const ChatBot = () => {
                 <Bot className="h-6 w-6" />
               </motion.div>
               <div>
-                <h1 className="text-2xl font-bold">AI 의학상담</h1>
-                <p className="text-sm opacity-90">임신과 출산 전문가 봇</p>
+                <h1 className="text-2xl font-bold">AI 챗봇 상담</h1>
               </div>
             </div>
           </div>
 
           {/* Chat Messages */}
-          <div className="h-96 overflow-y-auto p-6 space-y-4">
+          <div
+            ref={messagesContainerRef}
+            className="h-[36rem] overflow-y-auto p-6 space-y-4"
+          >
             {messages.map((message) => (
               <motion.div
                 key={message.id}
@@ -212,7 +221,6 @@ const ChatBot = () => {
                 </div>
               </motion.div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Suggested Questions */}
@@ -270,7 +278,7 @@ const ChatBot = () => {
             <div>
               <h3 className="font-semibold text-blue-900 mb-1">안내 사항</h3>
               <p className="text-sm text-blue-800">
-                AI 의학상담은 일반적인 정보 제공을 목적으로 하며, 실제 의학적 진단이나 치료를 대체할 수 없습니다.
+                AI 챗봇 상담은 일반적인 정보 제공을 목적으로 하며, 실제 의학적 진단이나 치료를 대체할 수 없습니다.
                 긴급한 상황이나 전문적인 진료가 필요한 경우 반드시 의사와 상담하세요.
               </p>
             </div>

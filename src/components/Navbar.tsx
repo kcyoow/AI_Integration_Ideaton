@@ -27,7 +27,7 @@ const Navbar = () => {
 
   const navItems = [
     { path: '/', label: '홈', icon: Baby },
-    { path: '/chatbot', label: 'AI 의학상담', icon: Stethoscope },
+    { path: '/chatbot', label: 'AI 챗봇 상담', icon: Stethoscope },
     { path: '/policy', label: '정책 추천', icon: Heart },
     { path: '/medical', label: '의료시설', icon: MapPin },
     { path: '/postpartum', label: '산후조리원', icon: Building2 },
@@ -40,10 +40,8 @@ const Navbar = () => {
       <motion.nav
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className={`sticky top-0 z-50 transition-all duration-150 ${
-          scrolled 
-            ? 'bg-white shadow-lg border-b border-gray-200' 
-            : 'bg-white shadow-md border-b border-gray-100'
+        className={`sticky top-0 z-50 transition-all duration-150 bg-white border-b-2 border-primary-200 ${
+          scrolled ? 'shadow-lg' : 'shadow-md'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -88,18 +86,6 @@ const Navbar = () => {
                         isActive ? 'text-primary-600' : 'text-gray-500 group-hover:text-primary-600'
                       }`} />
                       <span>{item.label}</span>
-                      {isActive && (
-                        <motion.div
-                          layoutId="activeTab"
-                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600"
-                          initial={false}
-                          transition={{ 
-                            type: "tween", 
-                            duration: 0.3,
-                            ease: "easeInOut"
-                          }}
-                        />
-                      )}
                     </Link>
                   </motion.div>
                 )

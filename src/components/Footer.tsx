@@ -51,7 +51,7 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">빠른 링크</h3>
             <ul className="space-y-2">
-              <li><a href="/chatbot" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">AI 의학상담</a></li>
+              <li><a href="/chatbot" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">AI 챗봇 상담</a></li>
               <li><a href="/policy" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">정책 추천</a></li>
               <li><a href="/medical" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">의료시설 찾기</a></li>
               <li><a href="/postpartum" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">산후조리원</a></li>

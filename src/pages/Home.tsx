@@ -13,10 +13,6 @@ import {
   Shield,
   Clock,
   CheckCircle,
-  Calendar,
-  FileText,
-  HelpCircle,
-  Activity,
   Zap,
   Target
 } from 'lucide-react'
@@ -25,7 +21,7 @@ const Home = () => {
   const features = [
     {
       icon: Stethoscope,
-      title: 'AI 의학상담',
+      title: 'AI 챗봇 상담',
       description: 'LLM 기반 임신/출산 의학정보 제공으로 정확하고 신뢰성 있는 정보를 24시간 제공',
       path: '/chatbot',
       color: 'bg-blue-500',
@@ -92,37 +88,6 @@ const Home = () => {
     }
   ]
 
-  const mainServices = [
-    {
-      icon: FileText,
-      title: '전자민원',
-      description: '각종 증명서 발급 및 민원 서비스',
-      count: '23종',
-      color: 'bg-blue-500'
-    },
-    {
-      icon: Calendar,
-      title: '예약 서비스',
-      description: '병원, 보건소, 산후조리원 예약',
-      count: '150+기관',
-      color: 'bg-green-500'
-    },
-    {
-      icon: HelpCircle,
-      title: '정책 상담',
-      description: '복지정책 및 지원제도 문의',
-      count: '24시간',
-      color: 'bg-purple-500'
-    },
-    {
-      icon: Activity,
-      title: '건강 관리',
-      description: '임산부 및 영유아 건강정보',
-      count: '전문가감수',
-      color: 'bg-orange-500'
-    }
-  ]
-
   const benefits = [
     { icon: Zap, title: '빠른 상담', description: '평균 응답 시간 30초 이내' },
     { icon: Target, title: '정확한 정보', description: '전문가 검증된 의학 정보' },
@@ -161,15 +126,11 @@ const Home = () => {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="text-center"
           >
-            <motion.div
-              animate={{ scale: [1, 1.1, 1], rotate: [-5, 5, -5] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="inline-block mb-8"
-            >
+            <div className="inline-block mb-8">
               <div className="bg-white bg-opacity-20 p-6 rounded-3xl backdrop-blur-sm border border-white border-opacity-30">
                 <Baby className="h-24 w-24 text-white" />
               </div>
-            </motion.div>
+            </div>
             
             <motion.h1 
               className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight"
@@ -226,60 +187,6 @@ const Home = () => {
               </motion.div>
             </motion.div>
           </motion.div>
-        </div>
-      </section>
-
-      {/* Main Services Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              주요 서비스
-            </h2>
-            <p className="text-xl text-gray-600">
-              안산맘케어가 제공하는 핵심 행정 서비스를 편리하게 이용하세요
-            </p>
-          </motion.div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {mainServices.map((service, index) => {
-              const Icon = service.icon
-              return (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ scale: 1.05, y: -5 }}
-                  className="text-center p-6 rounded-2xl bg-gradient-bg-light hover:shadow-xl transition-all duration-150 group cursor-pointer"
-                >
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: index * 0.2 }}
-                    className={`${service.color} w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:shadow-lg transition-all duration-150`}
-                  >
-                    <Icon className="h-8 w-8 text-white" />
-                  </motion.div>
-                  <div className="text-2xl font-bold text-gray-900 mb-2">
-                    {service.count}
-                  </div>
-                  <div className="text-lg font-semibold text-gray-700 mb-3">
-                    {service.title}
-                  </div>
-                  <div className="text-sm text-gray-600 leading-relaxed">
-                    {service.description}
-                  </div>
-                </motion.div>
-              )
-            })}
-          </div>
         </div>
       </section>
 
@@ -496,79 +403,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 gradient-bg"></div>
-        <div className="absolute inset-0 bg-black opacity-10"></div>
-        
-        {/* Animated Background */}
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 50, repeat: Infinity, ease: "linear" }}
-          className="absolute top-10 right-10 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{ rotate: -360 }}
-          transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-10 left-10 w-48 h-48 bg-white opacity-5 rounded-full blur-3xl"
-        />
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="inline-block mb-8"
-            >
-              <div className="bg-white bg-opacity-20 p-6 rounded-3xl backdrop-blur-sm border border-white border-opacity-30">
-                <Heart className="h-16 w-16 text-white" />
-              </div>
-            </motion.div>
-            
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              지금 바로 안산맘케어를 시작하세요
-            </h2>
-            <p className="text-xl text-secondary-100 mb-12 max-w-3xl mx-auto leading-relaxed">
-              전문가의 상담과 맞춤형 정보로 더 안전하고 편안한 임신/육아 생활을 경험해보세요<br />
-              수많은 맘들이 이미 경험한 변화를 직접 확인해보세요
-            </p>
-            
-            <motion.div
-              className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-            >
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "tween", duration: 0.15 }}>
-                <Link
-                  to="/policy"
-                  className="bg-white text-primary-700 px-10 py-5 rounded-full font-bold text-lg hover:bg-secondary-50 transition-all duration-150 shadow-2xl hover:shadow-white/25 flex items-center space-x-3"
-                >
-                  <Heart className="h-6 w-6" />
-                  <span>맞춤 정책 확인하기</span>
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
-              </motion.div>
-              
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "tween", duration: 0.15 }}>
-                <Link
-                  to="/community"
-                  className="border-2 border-white text-white px-10 py-5 rounded-full font-bold text-lg hover:bg-white hover:text-primary-700 transition-all duration-150 flex items-center space-x-3"
-                >
-                  <Users className="h-6 w-6" />
-                  <span>커뮤니티 둘러보기</span>
-                </Link>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
+      {/* CTA Section 제거 */}
     </div>
   )
 }
