@@ -1,8 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Bot, User, Clock, Info } from 'lucide-react'
+import { Send, Bot, User, Clock, Info, PlusCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { loadChat, saveChat, type StoredMessage } from '../lib/chatLocal'
+import {
+  createSession,
+  loadSessionList,
+  loadSessionMessages,
+  saveSessionMessages,
+  upsertSession,
+  type StoredMessage,
+  type ChatSessionMeta
+} from '../lib/chatLocal'
 
 interface Message {
   id: string
@@ -13,6 +21,7 @@ interface Message {
 
 const ChatBot = () => {
   const { auth } = useAuth()
+  const storageUserId = auth.userId ?? 'guest'
   const defaultMessages = useCallback((): Message[] => ([
     {
       id: 'welcome',
@@ -23,21 +32,64 @@ const ChatBot = () => {
   ]), [])
 
   const [messages, setMessages] = useState<Message[]>(() => defaultMessages())
+  const [sessions, setSessions] = useState<ChatSessionMeta[]>([])
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [typingSessionId, setTypingSessionId] = useState<string | null>(null)
   const [isInfoTooltipVisible, setIsInfoTooltipVisible] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const currentSessionRef = useRef<string | null>(null)
 
-  const persistMessages = useCallback((nextMessages: Message[]) => {
-    if (!auth.userId) return
-    const stored: StoredMessage[] = nextMessages.map(message => ({
+  useEffect(() => {
+    currentSessionRef.current = currentSessionId
+  }, [currentSessionId])
+
+  const toStored = useCallback((nextMessages: Message[]): StoredMessage[] => (
+    nextMessages.map(message => ({
       id: message.id,
       text: message.text,
       sender: message.sender,
       timestamp: message.timestamp.toISOString()
     }))
-    saveChat(auth.userId, stored)
-  }, [auth.userId])
+  ), [])
+
+  const fromStored = useCallback((stored: StoredMessage[]): Message[] => (
+    stored.map(item => ({
+      ...item,
+      timestamp: new Date(item.timestamp)
+    }))
+  ), [])
+
+  const persistMessages = useCallback((nextMessages: Message[], sessionId: string | null) => {
+    if (!sessionId) return
+    saveSessionMessages(storageUserId, sessionId, toStored(nextMessages))
+  }, [storageUserId, toStored])
+
+  const updateSessionMeta = useCallback((sessionId: string, updater: (session: ChatSessionMeta) => ChatSessionMeta) => {
+    setSessions(prev => {
+      const found = prev.find(session => session.id === sessionId)
+      if (!found) return prev
+      const updated = updater(found)
+      const nextList = upsertSession(storageUserId, updated)
+      return nextList
+    })
+  }, [storageUserId])
+
+  const makeSessionTitle = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return '새 상담'
+    return trimmed.length > 20 ? `${trimmed.slice(0, 20)}...` : trimmed
+  }, [])
+
+  const touchSession = useCallback((sessionId: string, titleCandidate?: string) => {
+    const now = new Date().toISOString()
+    updateSessionMeta(sessionId, session => ({
+      ...session,
+      title: session.title === '새 상담' && titleCandidate ? makeSessionTitle(titleCandidate) : session.title,
+      updatedAt: now
+    }))
+  }, [makeSessionTitle, updateSessionMeta])
 
   const scrollToBottom = () => {
     if (!messagesContainerRef.current) return
@@ -52,19 +104,35 @@ const ChatBot = () => {
   }, [messages])
 
   useEffect(() => {
-    if (auth.userId) {
-      const stored = loadChat(auth.userId)
-      if (stored.length > 0) {
-        setMessages(stored.map(item => ({
-          ...item,
-          timestamp: new Date(item.timestamp)
-        })))
-        return
-      }
+    const existingSessions = loadSessionList(storageUserId)
+
+    if (existingSessions.length === 0) {
+      const { session, list } = createSession(storageUserId)
+      const initialMessages = defaultMessages()
+      saveSessionMessages(storageUserId, session.id, toStored(initialMessages))
+      setSessions(list)
+      setCurrentSessionId(session.id)
+      setMessages(initialMessages)
+      return
     }
 
-    setMessages(defaultMessages())
-  }, [auth.userId, defaultMessages])
+    setSessions(existingSessions)
+    setCurrentSessionId(existingSessions[0].id)
+  }, [storageUserId, defaultMessages, toStored])
+
+  useEffect(() => {
+    if (!currentSessionId) return
+    const stored = loadSessionMessages(storageUserId, currentSessionId)
+    if (stored.length > 0) {
+      setMessages(fromStored(stored))
+    } else {
+      const initialMessages = defaultMessages()
+      saveSessionMessages(storageUserId, currentSessionId, toStored(initialMessages))
+      setMessages(initialMessages)
+    }
+    setIsTyping(false)
+    setTypingSessionId(null)
+  }, [currentSessionId, storageUserId, fromStored, defaultMessages, toStored])
 
   const suggestedQuestions = [
     '임신 초기 주의사항이 궁금해요',
@@ -75,8 +143,36 @@ const ChatBot = () => {
   const showSuggestedQuestions = !hasUserMessages
   const messagesContainerHeightClass = showSuggestedQuestions ? 'h-[36rem]' : 'h-[42rem]'
 
+  const handleSelectSession = (sessionId: string) => {
+    if (sessionId === currentSessionId) return
+    setCurrentSessionId(sessionId)
+  }
+
+  const handleNewSession = () => {
+    const { session, list } = createSession(storageUserId)
+    const initialMessages = defaultMessages()
+    saveSessionMessages(storageUserId, session.id, toStored(initialMessages))
+    setSessions(list)
+    setCurrentSessionId(session.id)
+    setMessages(initialMessages)
+  }
+
+  const formatSessionTime = (value: string) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleString('ko-KR', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   const addMessage = (text: string) => {
     if (text.trim() === '') return
+
+    const activeSessionId = currentSessionId
+    if (!activeSessionId) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -87,10 +183,12 @@ const ChatBot = () => {
 
     setMessages(prev => {
       const next = [...prev, userMessage]
-      persistMessages(next)
+      persistMessages(next, activeSessionId)
       return next
     })
     setIsTyping(true)
+    setTypingSessionId(activeSessionId)
+    touchSession(activeSessionId, text)
 
     setTimeout(() => {
       const botMessage: Message = {
@@ -99,12 +197,15 @@ const ChatBot = () => {
         sender: 'bot',
         timestamp: new Date()
       }
-      setMessages(prev => {
-        const next = [...prev, botMessage]
-        persistMessages(next)
-        return next
-      })
-      setIsTyping(false)
+      const storedMessages = loadSessionMessages(storageUserId, activeSessionId)
+      const nextStored = [...storedMessages, ...toStored([botMessage])]
+      saveSessionMessages(storageUserId, activeSessionId, nextStored)
+      touchSession(activeSessionId)
+      if (currentSessionRef.current === activeSessionId) {
+        setMessages(prev => [...prev, botMessage])
+        setIsTyping(false)
+        setTypingSessionId(null)
+      }
     }, 1500)
   }
 
@@ -141,6 +242,13 @@ const ChatBot = () => {
     addMessage(question)
   }
 
+  useEffect(() => {
+    if (typingSessionId && typingSessionId !== currentSessionId) {
+      setIsTyping(false)
+      setTypingSessionId(null)
+    }
+  }, [currentSessionId, typingSessionId])
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('ko-KR', {
       hour: '2-digit',
@@ -151,12 +259,56 @@ const ChatBot = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative bg-white rounded-2xl shadow-xl"
-        >
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          <motion.aside
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-5 h-max"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">상담 기록</h2>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleNewSession}
+                className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+              >
+                <PlusCircle className="h-4 w-4" />
+                새 상담
+              </motion.button>
+            </div>
+
+            <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+              {sessions.map(session => (
+                <button
+                  key={session.id}
+                  onClick={() => handleSelectSession(session.id)}
+                  className={`w-full text-left px-3 py-2 rounded-xl transition-colors duration-150 border ${
+                    currentSessionId === session.id
+                      ? 'bg-primary-50 border-primary-200 text-primary-700'
+                      : 'bg-gray-50 border-transparent hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <div className="font-medium text-sm truncate">{session.title}</div>
+                  <div className="text-xs text-gray-500 mt-1">{formatSessionTime(session.updatedAt)}</div>
+                </button>
+              ))}
+
+              {sessions.length === 0 && (
+                <div className="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 text-center">
+                  상담 내역이 없습니다.
+                  <br />새 상담을 시작해보세요.
+                </div>
+              )}
+            </div>
+          </motion.aside>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative bg-white rounded-2xl shadow-xl"
+          >
           {/* Header */}
           <div className="bg-gradient-to-r from-primary-500 to-secondary-500 text-white p-6">
             <div className="flex items-center space-x-3">
@@ -326,8 +478,8 @@ const ChatBot = () => {
               </motion.button>
             </div>
           </div>
-        </motion.div>
-
+          </motion.div>
+        </div>
       </div>
     </div>
   )
