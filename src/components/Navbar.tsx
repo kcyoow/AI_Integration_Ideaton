@@ -97,36 +97,50 @@ const Navbar = () => {
 
             {/* 우측 액션 버튼 */}
             <div className="hidden lg:flex items-center space-x-3">
-              {auth.userId ? (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    logout()
-                    window.location.href = '/'
-                  }}
-                  className="btn-outline text-sm"
-                >
-                  로그아웃
-                </motion.button>
-              ) : (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/login')}
-                  className="btn-outline text-sm"
-                >
-                  로그인
-                </motion.button>
+              {!auth.userId && (
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate('/signup')}
+                    className="btn-primary text-sm"
+                  >
+                    서비스 시작하기
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate('/login')}
+                    className="btn-outline text-sm"
+                  >
+                    로그인
+                  </motion.button>
+                </>
               )}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => navigate(auth.userId ? '/chatbot' : '/signup')}
-                className="btn-primary text-sm"
-              >
-                {auth.userId ? '챗봇으로 이동' : '서비스 시작하기'}
-              </motion.button>
+
+              {auth.userId && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center space-x-2 rounded-full bg-primary-50 px-4 py-1.5 text-sm font-semibold text-primary-700"
+                  >
+                    <Users className="h-4 w-4" />
+                    <span>{auth.nickname || auth.name || '안산맘'}</span>
+                  </motion.div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      logout()
+                      window.location.href = '/'
+                    }}
+                    className="btn-outline text-sm"
+                  >
+                    로그아웃
+                  </motion.button>
+                </>
+              )}
             </div>
 
             {/* 모바일 메뉴 버튼 */}

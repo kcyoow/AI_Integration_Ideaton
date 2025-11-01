@@ -16,6 +16,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userId: null,
     username: null,
     name: null,
+    nickname: null,
     address: null
   })
 
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId: null,
         username: null,
         name: null,
+        nickname: null,
         address: null
       })
     }
@@ -58,4 +60,3 @@ export function useAuth() {
   }
   return ctx
 }
-

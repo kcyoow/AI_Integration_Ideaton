@@ -3,6 +3,7 @@ export type SignupInput = {
   password: string
   address: string
   name: string
+  nickname: string
   age: number
   isPregnant?: boolean
   weeks?: number | null
@@ -19,6 +20,7 @@ export type AuthState = {
   userId: string | null
   username: string | null
   name: string | null
+  nickname: string | null
   address: string | null
 }
 
@@ -40,6 +42,7 @@ export function makeInternalId(payload: SignupInput) {
     payload.password,
     payload.address,
     payload.name,
+    payload.nickname,
     String(payload.age ?? ''),
     payload.isPregnant ? 'Y' : 'N',
     String(payload.weeks ?? ''),
@@ -86,6 +89,7 @@ export function signupLocal(input: SignupInput) {
     userId: internalId,
     username: input.username,
     name: input.name,
+    nickname: input.nickname,
     address: input.address
   }
 
@@ -105,6 +109,7 @@ export function loginLocal(username: string, password: string) {
     userId: found.internalId,
     username: found.username,
     name: found.name,
+    nickname: found.nickname ?? null,
     address: found.address
   }
 
@@ -120,17 +125,26 @@ export function loadSession(): AuthState {
         userId: null,
         username: null,
         name: null,
+        nickname: null,
         address: null
       }
     }
 
-    return JSON.parse(raw)
+    const parsed = JSON.parse(raw)
+    return {
+      userId: parsed?.userId ?? null,
+      username: parsed?.username ?? null,
+      name: parsed?.name ?? null,
+      nickname: parsed?.nickname ?? null,
+      address: parsed?.address ?? null
+    }
   } catch (error) {
     console.error(error)
     return {
       userId: null,
       username: null,
       name: null,
+      nickname: null,
       address: null
     }
   }
@@ -139,4 +153,3 @@ export function loadSession(): AuthState {
 export function clearSession() {
   localStorage.removeItem(LS_SESSION)
 }
-

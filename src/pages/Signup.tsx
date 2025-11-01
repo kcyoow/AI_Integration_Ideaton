@@ -13,6 +13,7 @@ const Signup = () => {
     password: '',
     address: '',
     name: '',
+    nickname: '',
     age: '',
     isPregnant: false,
     weeks: '',
@@ -38,6 +39,11 @@ const Signup = () => {
     event.preventDefault()
     setError(null)
 
+    if (!form.nickname.trim()) {
+      setError('닉네임을 입력해주세요.')
+      return
+    }
+
     if (!form.address.trim()) {
       setError('주소를 입력해주세요.')
       return
@@ -51,6 +57,7 @@ const Signup = () => {
         password: form.password,
         address: form.address.trim(),
         name: form.name.trim(),
+        nickname: form.nickname.trim(),
         age: Number(form.age),
         isPregnant: form.isPregnant,
         weeks: form.isPregnant ? Number(form.weeks || 0) : null,
@@ -180,6 +187,17 @@ const Signup = () => {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">닉네임</label>
+              <input
+                type="text"
+                value={form.nickname}
+                onChange={(event) => handleChange('nickname', event.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="커뮤니티에서 사용할 닉네임"
+                required
+              />
+            </div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">나이</label>
               <input
                 type="number"
