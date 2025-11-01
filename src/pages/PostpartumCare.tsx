@@ -10,146 +10,48 @@ import {
   Home,
   Users,
   Bed,
-  Utensils,
-  Award,
   Navigation
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-
-interface PostpartumCenter {
-  id: string
-  name: string
-  type: 'hospital' | 'hotel' | 'home'
-  address: string
-  phone: string
-  rating: number
-  priceRange: {
-    min: number
-    max: number
-    unit: '1주' | '2주' | '1박'
-  }
-  duration: {
-    min: number
-    max: number
-    unit: '주'
-  }
-  features: string[]
-  services: string[]
-  description: string
-  capacity: number
-  staffRatio: string
-  meals: string
-  distance: string
-  availability: 'available' | 'limited' | 'full'
-}
+import { fetchPostnatalCare, type PostnatalCareItem } from '../lib/ggApi'
 
 const PostpartumCare = () => {
   const { auth } = useAuth()
+
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState('all')
-  const [priceRange, setPriceRange] = useState('all')
-  const [duration, setDuration] = useState('all')
-  const [sortBy, setSortBy] = useState('rating')
-  const [userAddress, setUserAddress] = useState('안산시 상록구')
+  const [sigun, setSigun] = useState('안산시')
+
+  const [items, setItems] = useState<PostnatalCareItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (auth.address) {
-      setUserAddress(prev => (prev === '' || prev === '안산시 상록구') ? (auth.address ?? prev) : prev)
+      // 주소에 도시명이 포함되어 있으면 시군 값을 추출(간단 추정)
+      const addr = String(auth.address)
+      if (addr.includes('안산')) setSigun('안산시')
     }
   }, [auth.address])
 
-  const centers: PostpartumCenter[] = [
-    {
-      id: '1',
-      name: '안산마미스산후조리원',
-      type: 'hotel',
-      address: '경기도 안산시 상록구 한대역로 120',
-      phone: '031-419-7700',
-      rating: 4.9,
-      priceRange: { min: 250, max: 450, unit: '1주' },
-      duration: { min: 1, max: 2, unit: '주' },
-      features: ['산모전용룸', '남편동반가능', '유아동반가능', '개인욕실'],
-      services: ['산모맞춤식단', '신생아돌봄', '출산후마사지', '우유마사지', '산모교육'],
-      description: '최고의 서비스와 시설을 갖춘 프리미엄 산후조리원입니다.',
-      capacity: 25,
-      staffRatio: '1:2',
-      meals: '한식/양식 선택',
-      distance: '1.5km',
-      availability: 'available'
-    },
-    {
-      id: '2',
-      name: '사랑이산후조리원',
-      type: 'hospital',
-      address: '경기도 안산시 단원구 초지동 230',
-      phone: '031-492-8800',
-      rating: 4.7,
-      priceRange: { min: 200, max: 350, unit: '1주' },
-      duration: { min: 1, max: 3, unit: '주' },
-      features: ['의료진상주', '산모전용룸', '24시간간호', '응급대응'],
-      services: ['의료관리', '산후조리', '신생아관리', '모유수유교육'],
-      description: '의료진이 상주하여 안전하고 체계적인 산후조리를 제공합니다.',
-      capacity: 30,
-      staffRatio: '1:1.5',
-      meals: '산모맞춤한식',
-      distance: '3.2km',
-      availability: 'limited'
-    },
-    {
-      id: '3',
-      name: '행복한엄마산후조리',
-      type: 'home',
-      address: '경기도 안산시 상록구 반월동 450',
-      phone: '031-400-9900',
-      rating: 4.6,
-      priceRange: { min: 180, max: 280, unit: '1주' },
-      duration: { min: 2, max: 4, unit: '주' },
-      features: ['방문서비스', '개인맞춤', '시간선택가능'],
-      services: ['방문산후조리', '신생아돌봄', '가사도우미', '산모식단'],
-      description: '집에서 편안하게 받는 맞춤형 방문 산후조리 서비스입니다.',
-      capacity: 15,
-      staffRatio: '1:1',
-      meals: '직접조리',
-      distance: '방문',
-      availability: 'available'
-    },
-    {
-      id: '4',
-      name: '더샘산후조리원',
-      type: 'hotel',
-      address: '경기도 안산시 상록구 고잔동 180',
-      phone: '031-480-6600',
-      rating: 4.8,
-      priceRange: { min: 300, max: 500, unit: '1주' },
-      duration: { min: 1, max: 2, unit: '주' },
-      features: ['호텔급시설', '남편동반', '가족면회가능', '프로그램다양'],
-      services: ['호텔서비스', '산후조리', '신생아돌봄', '피부관리', '체조교실'],
-      description: '호텔급 시설과 서비스로 특별한 산후조리 경험을 제공합니다.',
-      capacity: 20,
-      staffRatio: '1:2',
-      meals: '호텔급양식',
-      distance: '2.1km',
-      availability: 'available'
-    },
-    {
-      id: '5',
-      name: '해피맘산후조리원',
-      type: 'hospital',
-      address: '경기도 안산시 단원구 원시동 320',
-      phone: '031-495-5500',
-      rating: 4.5,
-      priceRange: { min: 220, max: 380, unit: '1주' },
-      duration: { min: 1, max: 3, unit: '주' },
-      features: ['병원연계', '24시간돌봄', '산모교육'],
-      services: ['병원연계관리', '산후조리', '신생아돌봄', '모유수유상담'],
-      description: '병원과 연계된 체계적인 산후조리 서비스를 제공합니다.',
-      capacity: 28,
-      staffRatio: '1:1.8',
-      meals: '병원영양팀',
-      distance: '4.5km',
-      availability: 'full'
-    }
-  ]
+  useEffect(() => {
+    const abort = new AbortController()
+    setLoading(true)
+    setError(null)
+    fetchPostnatalCare({ sigun, q: searchTerm.trim(), page: 1, size: 50, signal: abort.signal })
+      .then((res) => {
+        setItems(res.items)
+        setTotal(res.total)
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : '데이터를 불러오지 못했습니다.'
+        setError(msg)
+      })
+      .finally(() => setLoading(false))
+
+    return () => abort.abort()
+  }, [sigun, searchTerm])
 
   const centerTypes = [
     { id: 'all', name: '전체', icon: Home },
@@ -158,45 +60,9 @@ const PostpartumCare = () => {
     { id: 'home', name: '방문형', icon: Users }
   ]
 
-  const priceRanges = [
-    { id: 'all', name: '전체 가격대' },
-    { id: 'low', name: '100-200만원' },
-    { id: 'medium', name: '200-300만원' },
-    { id: 'high', name: '300만원 이상' }
-  ]
-
-  const durations = [
-    { id: 'all', name: '전체 기간' },
-    { id: 'short', name: '1주' },
-    { id: 'medium', name: '2주' },
-    { id: 'long', name: '3주 이상' }
-  ]
-
-  const filteredCenters = centers.filter(center => {
-    const matchesSearch = center.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         center.address.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = selectedType === 'all' || center.type === selectedType
-    
-    let matchesPrice = priceRange === 'all'
-    if (priceRange !== 'all') {
-      if (priceRange === 'low') matchesPrice = center.priceRange.max <= 200
-      if (priceRange === 'medium') matchesPrice = center.priceRange.min >= 200 && center.priceRange.max <= 300
-      if (priceRange === 'high') matchesPrice = center.priceRange.min >= 300
-    }
-    
-    let matchesDuration = duration === 'all'
-    if (duration !== 'all') {
-      if (duration === 'short') matchesDuration = center.duration.min <= 1
-      if (duration === 'medium') matchesDuration = center.duration.min <= 2 && center.duration.max >= 2
-      if (duration === 'long') matchesDuration = center.duration.max >= 3
-    }
-    
-    return matchesSearch && matchesType && matchesPrice && matchesDuration
-  }).sort((a, b) => {
-    if (sortBy === 'rating') return b.rating - a.rating
-    if (sortBy === 'price') return a.priceRange.min - b.priceRange.min
-    if (sortBy === 'distance') return parseFloat(a.distance) - parseFloat(b.distance)
-    return 0
+  const filteredCenters = items.filter(item => {
+    const matchesType = selectedType === 'all' || item.type === selectedType
+    return matchesType
   })
 
   const getCenterIcon = (type: string) => {
@@ -217,24 +83,15 @@ const PostpartumCare = () => {
     }
   }
 
-  const getAvailabilityColor = (availability: string) => {
-    switch (availability) {
-      case 'available': return 'bg-green-100 text-green-800'
-      case 'limited': return 'bg-yellow-100 text-yellow-800'
-      case 'full': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+  const openMap = (item: PostnatalCareItem) => {
+    if (item.coordinates) {
+      const { lat, lng } = item.coordinates
+      const href = `https://map.naver.com/v5/?c=${lng},${lat},16,0,0,0,dh`
+      window.open(href, '_blank', 'noopener')
+    } else {
+      const query = encodeURIComponent(`${item.name} ${item.address}`)
+      window.open(`https://map.naver.com/p/search/${query}`, '_blank', 'noopener')
     }
-  }
-
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${
-          i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-        }`}
-      />
-    ))
   }
 
   return (
@@ -253,7 +110,7 @@ const PostpartumCare = () => {
             조건에 맞는 산후조리원을 비교하고 선택해보세요
           </p>
           <p className="text-sm text-gray-500 mt-2">
-            ※ 가격 정보는 공공기관 데이터 기준으로 제공됩니다
+            ※ 데이터는 경기도 공공데이터 API 기준으로 제공됩니다
           </p>
         </motion.div>
 
@@ -278,23 +135,21 @@ const PostpartumCare = () => {
             </div>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">기본 위치</label>
-            <div className="flex items-center space-x-2">
-              <MapPin className="h-5 w-5 text-primary-500" />
-              <input
-                type="text"
-                value={userAddress}
-                onChange={(event) => setUserAddress(event.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="주소를 입력하세요"
-              />
-              <span className="text-xs text-gray-500">로그인 시 자동 입력</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">기본 위치(시군)</h3>
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5 text-primary-500" />
+                <input
+                  type="text"
+                  value={sigun}
+                  onChange={(event) => setSigun(event.target.value)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="예: 안산시"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Filter Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">시설 유형</h3>
               <select
@@ -305,45 +160,6 @@ const PostpartumCare = () => {
                 {centerTypes.map(type => (
                   <option key={type.id} value={type.id}>{type.name}</option>
                 ))}
-              </select>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">가격대</h3>
-              <select
-                value={priceRange}
-                onChange={(e) => setPriceRange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                {priceRanges.map(range => (
-                  <option key={range.id} value={range.id}>{range.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">이용 기간</h3>
-              <select
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                {durations.map(dur => (
-                  <option key={dur.id} value={dur.id}>{dur.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">정렬</h3>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="rating">평점순</option>
-                <option value="price">가격순</option>
-                <option value="distance">거리순</option>
               </select>
             </div>
           </div>
@@ -373,6 +189,17 @@ const PostpartumCare = () => {
           </div>
         </motion.div>
 
+        {/* Status / Error */}
+        {loading && (
+          <div className="text-center text-gray-600 mb-4">불러오는 중...</div>
+        )}
+        {error && (
+          <div className="text-center text-red-600 mb-4">{error}</div>
+        )}
+        {!loading && !error && (
+          <div className="text-sm text-gray-500 mb-4">총 {total}건</div>
+        )}
+
         {/* Centers List */}
         <div className="space-y-6">
           {filteredCenters.map((center, index) => (
@@ -380,7 +207,7 @@ const PostpartumCare = () => {
               key={center.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + index * 0.1 }}
+              transition={{ delay: 0.2 + index * 0.05 }}
               className="card group hover:shadow-xl"
             >
               <div className="flex items-start justify-between mb-4">
@@ -393,120 +220,66 @@ const PostpartumCare = () => {
                       <h3 className="text-xl font-semibold text-gray-900">
                         {center.name}
                       </h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getAvailabilityColor(center.availability)}`}>
-                        {center.availability === 'available' ? '예약가능' : 
-                         center.availability === 'limited' ? '예약마감임박' : '예약마감'}
-                      </span>
+                      {center.status && (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                          {center.status}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center space-x-4 mt-1">
                       <div className="flex items-center space-x-1">
-                        {renderStars(center.rating)}
-                        <span className="text-sm text-gray-600 ml-1">({center.rating})</span>
+                        <Star className="h-4 w-4 text-gray-300" />
+                        <span className="text-sm text-gray-400">평점정보없음</span>
                       </div>
-                      <span className="text-sm text-gray-500">
-                        <MapPin className="inline-block h-3 w-3 mr-1" />
-                        {center.distance}
-                      </span>
+                      {center.licenseDate && (
+                        <span className="text-sm text-gray-500">
+                          <Calendar className="inline-block h-3 w-3 mr-1" />
+                          허가일 {center.licenseDate}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-primary-600">
-                    {center.priceRange.min.toLocaleString()}~{center.priceRange.max.toLocaleString()}만원
+                  <div className="text-sm text-gray-600">
+                    정원: {center.capacity ?? '정보없음'}명
                   </div>
-                  <div className="text-sm text-gray-500">
-                    ({center.priceRange.unit} 기준)
+                  <div className="text-xs text-gray-500">
+                    간호사 {center.nurseCount ?? '-'} / 간호보조 {center.nurseAidCount ?? '-'}
                   </div>
                 </div>
               </div>
-
-              <p className="text-gray-600 mb-4">
-                {center.description}
-              </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4 text-primary-500" />
-                  <span className="text-sm text-gray-700">
-                    <strong>이용기간:</strong> {center.duration.min}~{center.duration.max}{center.duration.unit}
-                  </span>
+                  <MapPin className="h-4 w-4 text-primary-500" />
+                  <span className="text-sm text-gray-700">{center.address}</span>
                 </div>
-                
                 <div className="flex items-center space-x-2">
-                  <Users className="h-4 w-4 text-primary-500" />
-                  <span className="text-sm text-gray-700">
-                    <strong>인원비율:</strong> {center.staffRatio}
-                  </span>
+                  <Phone className="h-4 w-4 text-primary-500" />
+                  <span className="text-sm text-gray-700">{center.phone || '-'}</span>
                 </div>
-                
                 <div className="flex items-center space-x-2">
-                  <Utensils className="h-4 w-4 text-primary-500" />
-                  <span className="text-sm text-gray-700">
-                    <strong>식사:</strong> {center.meals}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">주요 특징</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {center.features.map((feature, featureIndex) => (
-                      <span
-                        key={featureIndex}
-                        className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs"
-                      >
-                        {feature}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">제공 서비스</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {center.services.map((service, serviceIndex) => (
-                      <span
-                        key={serviceIndex}
-                        className="px-2 py-1 bg-green-50 text-green-600 rounded text-xs"
-                      >
-                        {service}
-                      </span>
-                    ))}
-                  </div>
+                  <Home className="h-4 w-4 text-primary-500" />
+                  <span className="text-sm text-gray-700">{center.sigunName}</span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span>
-                    <MapPin className="inline-block h-3 w-3 mr-1" />
-                    {center.address}
-                  </span>
-                  <span>
-                    <Phone className="inline-block h-3 w-3 mr-1" />
-                    {center.phone}
-                  </span>
+                <div className="text-sm text-gray-500">
+                  좌표: {center.coordinates ? `${center.coordinates.lat}, ${center.coordinates.lng}` : '정보없음'}
                 </div>
-                
                 <div className="flex space-x-2">
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     transition={{ type: 'tween', duration: 0.15 }}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-150"
+                    onClick={() => openMap(center)}
                   >
                     <Navigation className="inline-block h-4 w-4 mr-1" />
                     지도 보기
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: 'tween', duration: 0.15 }}
-                    className="btn-primary text-sm px-4 py-2"
-                  >
-                    상세 정보 및 예약
                   </motion.button>
                 </div>
               </div>
@@ -515,7 +288,7 @@ const PostpartumCare = () => {
         </div>
 
         {/* Empty State */}
-        {filteredCenters.length === 0 && (
+        {!loading && !error && filteredCenters.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -539,12 +312,11 @@ const PostpartumCare = () => {
           className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4"
         >
           <div className="flex items-start space-x-3">
-            <Award className="h-5 w-5 text-blue-600 mt-0.5" />
+            <Calendar className="h-5 w-5 text-blue-600 mt-0.5" />
             <div>
               <h3 className="font-semibold text-blue-900 mb-1">안내 사항</h3>
               <p className="text-sm text-blue-800">
-                산후조리원 가격 정보는 안산시 보건소에서 제공하는 공공 데이터를 기준으로 합니다.
-                실제 이용 시 시설과 직접 확인 후 예약하시기 바랍니다. 정부 지원금이 적용될 수 있습니다.
+                일부 정보(유형, 가격, 평점 등)는 공공데이터에 포함되어 있지 않아 표시되지 않을 수 있습니다. 필요한 정보는 시설에 직접 문의해주세요.
               </p>
             </div>
           </div>
