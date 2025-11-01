@@ -1,21 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Search, 
-  Filter, 
   MapPin, 
   Phone, 
   Star, 
   Calendar,
-  DollarSign,
   Heart,
   Home,
   Users,
-  Clock,
-  CheckCircle,
   Bed,
   Utensils,
-  Baby,
   Award,
   Navigation
 } from 'lucide-react'
@@ -59,7 +54,7 @@ const PostpartumCare = () => {
 
   useEffect(() => {
     if (auth.address) {
-      setUserAddress(prev => (prev === '' || prev === '안산시 상록구') ? auth.address : prev)
+      setUserAddress(prev => (prev === '' || prev === '안산시 상록구') ? (auth.address ?? prev) : prev)
     }
   }, [auth.address])
 

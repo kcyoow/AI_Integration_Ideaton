@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Bot, User, Clock, Info, PlusCircle } from 'lucide-react'
+import { Send, Bot, User, Info, PlusCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import {
   createSession,
@@ -331,7 +331,7 @@ const ChatBot = () => {
           <div className="bg-gradient-to-r from-primary-500 to-secondary-500 text-white p-6">
             <div className="flex items-center space-x-3">
               <motion.div
-                animate={{ pulse: [1, 1.1, 1] }}
+                animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
                 className="bg-white bg-opacity-20 p-3 rounded-full"
               >

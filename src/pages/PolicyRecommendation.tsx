@@ -1,18 +1,13 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
-  Search, 
-  Filter, 
-  Calendar, 
   DollarSign, 
-  Baby, 
   Users,
   CheckCircle,
   Clock,
   FileText,
   Heart,
   Home,
-  Car,
   BookOpen,
   AlertCircle
 } from 'lucide-react'

@@ -48,7 +48,7 @@ const pageTransition = {
   duration: 0.4
 }
 
-const pageStyle = {
+const pageStyle: React.CSSProperties = {
   position: 'relative',
   width: '100%',
   minHeight: '100%'
