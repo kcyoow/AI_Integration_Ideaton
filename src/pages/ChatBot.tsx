@@ -74,7 +74,7 @@ const ChatBot = () => {
       text: item.text,
       sender: item.sender,
       timestamp: new Date(item.timestamp),
-      kind: (item as any).kind ?? 'text',
+      kind: ((item as any).kind ?? 'text') as Message['kind'],
       payload: (item as any).payload
     }))
   ), [])
@@ -343,7 +343,7 @@ const ChatBot = () => {
           // 데이터 실패: 로딩 버블을 에러 텍스트로 교체
           setMessages(prev => {
             const next = prev.map(m => m.id === loadingId
-              ? { ...m, kind: 'text', text: '죄송합니다. 산후조리원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }
+              ? { ...m, kind: 'text' as const, text: '죄송합니다. 산후조리원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }
               : m)
             persistMessages(next, activeSessionId)
             return next
@@ -371,7 +371,7 @@ const ChatBot = () => {
         // 로딩 버블을 결과 카드로 교체
         setMessages(prev => {
           const next = prev.map(m => m.id === loadingId
-            ? { ...m, text: '', kind: 'postnatalCards', payload: { sigun, items: topN } as any }
+            ? { ...m, text: '', kind: 'postnatalCards' as const, payload: { sigun, items: topN } as PostnatalBlockPayload }
             : m)
           persistMessages(next, activeSessionId)
           return next
