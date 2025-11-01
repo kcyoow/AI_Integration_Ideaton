@@ -66,6 +66,7 @@ const ChatBot = () => {
   const infoShownRef = useRef<{ postnatal: boolean; medical: boolean }>({ postnatal: false, medical: false })
   const recentCardsRef = useRef<'postnatal' | 'medical' | null>(null)
   const suppressCurrentReplyRef = useRef<boolean>(false)
+  const loginGateShownRef = useRef<{ postnatal: boolean; medical: boolean }>({ postnatal: false, medical: false })
 
   const isChatBlocked = busyCount > 0
 
@@ -150,12 +151,17 @@ const ChatBot = () => {
         payload: { cta: 'login' }
       }
       setMessages(prev => {
-        const last = prev[prev.length - 1]
-        if (last && last.kind === 'ctaLogin') return prev
+        if (loginGateShownRef.current.postnatal) return prev
+        loginGateShownRef.current.postnatal = true
         const next = [...prev, loginMsg]
         persistMessages(next, activeSessionId)
         return next
       })
+      // 타이핑 표시 제거
+      if (currentSessionRef.current === activeSessionId) {
+        setIsTyping(false)
+        setTypingSessionId(null)
+      }
       return
     }
 
@@ -266,12 +272,16 @@ const ChatBot = () => {
         payload: { cta: 'login' }
       }
       setMessages(prev => {
-        const last = prev[prev.length - 1]
-        if (last && last.kind === 'ctaLogin') return prev
+        if (loginGateShownRef.current.medical) return prev
+        loginGateShownRef.current.medical = true
         const next = [...prev, loginMsg]
         persistMessages(next, activeSessionId)
         return next
       })
+      if (currentSessionRef.current === activeSessionId) {
+        setIsTyping(false)
+        setTypingSessionId(null)
+      }
       return
     }
 
@@ -423,6 +433,13 @@ const ChatBot = () => {
     const activeSessionId = currentSessionId
     if (!activeSessionId) return
 
+    // 새 턴 시작: 각종 플래그 초기화
+    infoShownRef.current = { postnatal: false, medical: false }
+    recentCardsRef.current = null
+    suppressCurrentReplyRef.current = false
+    disableLocalPostnatalRef.current = false
+    loginGateShownRef.current = { postnatal: false, medical: false }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -504,7 +521,7 @@ const ChatBot = () => {
               disableLocalPostnatalRef.current = true
               ;(async () => {
                 // 안내 버블이 아직 없다면 먼저 추가하여 순서 보장
-                if (!infoShownRef.current.postnatal) {
+                if (auth.userId && !infoShownRef.current.postnatal) {
                   const infoMsg: Message = {
                     id: (Date.now() + Math.random()).toString(),
                     text: '근처 산후조리원 위치를 찾아볼게요',
@@ -530,7 +547,7 @@ const ChatBot = () => {
             } else if (action.name === 'medical.recommend') {
               suppressCurrentReplyRef.current = true
               ;(async () => {
-                if (!infoShownRef.current.medical) {
+                if (auth.userId && !infoShownRef.current.medical) {
                   const infoMsg: Message = {
                     id: (Date.now() + Math.random()).toString(),
                     text: '근처 의료시설을 찾아볼게요',
@@ -629,11 +646,11 @@ const ChatBot = () => {
       try {
         // 서버 action을 잠시 기다렸다가(예: 800ms) 오지 않으면 백업 로직 수행
         await new Promise(resolve => setTimeout(resolve, 800))
-        // 이번 턴 모델 답변 차단(형식 답변만)
-        suppressCurrentReplyRef.current = true
         if (disableLocalPostnatalRef.current) return
         if (!detectPostnatalCareIntent(text)) return
         if (currentSessionRef.current !== activeSessionId) return
+        // 이번 턴 모델 답변 차단(형식 답변만) — 위치 의도일 때만
+        suppressCurrentReplyRef.current = true
         setBusyCount(prev => prev + 1)
         pendingCardTasksRef.current += 1
         try {
