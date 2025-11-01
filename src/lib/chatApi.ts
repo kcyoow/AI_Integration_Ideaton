@@ -11,6 +11,7 @@ export type ChatEvent =
   | { type: 'token'; content: string }
   | { type: 'message'; content: string }
   | { type: 'suggestions'; suggestions: string[] }
+  | { type: 'action'; name: 'postnatal.recommend' | 'medical.recommend'; params?: Record<string, any> }
   | { type: 'end' }
 
 async function* parseNdjsonStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<any, void, void> {

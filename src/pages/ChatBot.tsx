@@ -16,10 +16,16 @@ import { streamChat, type ChatInMessage } from '../lib/chatApi'
 import { detectPostnatalCareIntent, extractSigunFromAddress } from '../lib/intent'
 import { fetchPostnatalCare, type PostnatalCareItem } from '../lib/ggApi'
 import { geocodeAddress, distanceKm, type Coordinates } from '../lib/geo'
+import { loadMedicalFacilities, type MedicalFacility } from '../lib/facilities'
 
 type PostnatalBlockPayload = {
   sigun: string
   items: Array<PostnatalCareItem & { distanceKm?: number | null }>
+}
+
+type MedicalBlockPayload = {
+  sigun: string
+  items: MedicalFacility[]
 }
 
 interface Message {
@@ -27,8 +33,8 @@ interface Message {
   text: string
   sender: 'user' | 'bot'
   timestamp: Date
-  kind?: 'text' | 'postnatalCards' | 'ctaLogin' | 'postnatalLoading'
-  payload?: PostnatalBlockPayload | { cta: 'login' }
+  kind?: 'text' | 'postnatalCards' | 'ctaLogin' | 'postnatalLoading' | 'medicalCards' | 'medicalLoading'
+  payload?: PostnatalBlockPayload | MedicalBlockPayload | { cta: 'login' }
 }
 
 const ChatBot = () => {
@@ -52,6 +58,7 @@ const ChatBot = () => {
   const [isInfoTooltipVisible, setIsInfoTooltipVisible] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const currentSessionRef = useRef<string | null>(null)
+  const disableLocalPostnatalRef = useRef<boolean>(false)
 
   useEffect(() => {
     currentSessionRef.current = currentSessionId
@@ -117,6 +124,174 @@ const ChatBot = () => {
     })
   }
 
+  // 서버 action 또는 로컬 의도에 의해 호출되는 산후조리원 추천 플로우
+  const triggerPostnatalRecommend = async (activeSessionId: string) => {
+    // 미로그인: 로그인 유도 버블
+    if (!auth.userId) {
+      const loginMsg: Message = {
+        id: (Date.now() + 2).toString(),
+        text: '산후조리원 정보는 로그인 후 이용하실 수 있습니다.',
+        sender: 'bot',
+        timestamp: new Date(),
+        kind: 'ctaLogin',
+        payload: { cta: 'login' }
+      }
+      setMessages(prev => {
+        const next = [...prev, loginMsg]
+        persistMessages(next, activeSessionId)
+        return next
+      })
+      return
+    }
+
+    const loadingId = (Date.now() + 12).toString()
+    const loadingMsg: Message = {
+      id: loadingId,
+      text: '산후조리원 정보를 불러오는 중...\n네트워크 상황에 따라 최대 수 초가 소요될 수 있습니다.',
+      sender: 'bot',
+      timestamp: new Date(),
+      kind: 'postnatalLoading'
+    }
+    setMessages(prev => {
+      const next = [...prev, loadingMsg]
+      persistMessages(next, activeSessionId)
+      return next
+    })
+
+    const fallbackSigun = (import.meta as any).env?.VITE_DEFAULT_SIGUN || '안산시'
+    const sigun = extractSigunFromAddress(auth.address) || fallbackSigun
+    const userLoc: Coordinates | null = await geocodeAddress(auth.address || '')
+
+    let ranked: Array<PostnatalCareItem & { distanceKm?: number | null }> = []
+    try {
+      const res = await fetchPostnatalCare({ sigun, size: 50 })
+      const list = Array.isArray(res.items) ? res.items : []
+      if (userLoc) {
+        ranked = list
+          .map(it => {
+            const d = it.coordinates ? distanceKm(userLoc, it.coordinates) : null
+            return { ...it, distanceKm: d }
+          })
+          .sort((a, b) => {
+            const da = a.distanceKm ?? Number.POSITIVE_INFINITY
+            const db = b.distanceKm ?? Number.POSITIVE_INFINITY
+            return da - db
+          })
+      } else {
+        ranked = list
+      }
+    } catch (e) {
+      setMessages(prev => {
+        const next = prev.map(m => m.id === loadingId
+          ? { ...m, kind: 'text' as const, text: '죄송합니다. 산후조리원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }
+          : m)
+        persistMessages(next, activeSessionId)
+        return next
+      })
+      return
+    }
+
+    const topN = ranked.slice(0, 5)
+
+    if (!auth.address) {
+      const infoMsg: Message = {
+        id: (Date.now() + 3.5).toString(),
+        text: `등록된 주소가 없어 기본 위치(${sigun}) 기준으로 추천합니다. 회원정보에서 주소를 추가하시면 거리순 추천을 받을 수 있어요.`,
+        sender: 'bot',
+        timestamp: new Date(),
+        kind: 'text'
+      }
+      setMessages(prev => {
+        const next = [...prev, infoMsg]
+        persistMessages(next, activeSessionId)
+        return next
+      })
+    }
+
+    setMessages(prev => {
+      const next = prev.map(m => m.id === loadingId
+        ? { ...m, text: '', kind: 'postnatalCards' as const, payload: { sigun, items: topN } as PostnatalBlockPayload }
+        : m)
+      persistMessages(next, activeSessionId)
+      return next
+    })
+  }
+
+  // 서버 action에 의해 호출되는 의료시설 추천 플로우
+  const triggerMedicalRecommend = async (activeSessionId: string) => {
+    if (!auth.userId) {
+      const loginMsg: Message = {
+        id: (Date.now() + 2).toString(),
+        text: '의료시설 정보는 로그인 후 이용하실 수 있습니다.',
+        sender: 'bot',
+        timestamp: new Date(),
+        kind: 'ctaLogin',
+        payload: { cta: 'login' }
+      }
+      setMessages(prev => {
+        const next = [...prev, loginMsg]
+        persistMessages(next, activeSessionId)
+        return next
+      })
+      return
+    }
+
+    const loadingId = (Date.now() + 22).toString()
+    const loadingMsg: Message = {
+      id: loadingId,
+      text: '의료시설 정보를 불러오는 중...\n네트워크 환경에 따라 수 초가 소요될 수 있습니다.',
+      sender: 'bot',
+      timestamp: new Date(),
+      kind: 'medicalLoading'
+    }
+    setMessages(prev => {
+      const next = [...prev, loadingMsg]
+      persistMessages(next, activeSessionId)
+      return next
+    })
+
+    const fallbackSigun = (import.meta as any).env?.VITE_DEFAULT_SIGUN || '안산시'
+    const sigun = extractSigunFromAddress(auth.address) || fallbackSigun
+
+    let items: MedicalFacility[] = []
+    try {
+      items = await loadMedicalFacilities({ sigun, size: 50 })
+    } catch (e) {
+      setMessages(prev => {
+        const next = prev.map(m => m.id === loadingId
+          ? { ...m, kind: 'text' as const, text: '죄송합니다. 의료시설 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }
+          : m)
+        persistMessages(next, activeSessionId)
+        return next
+      })
+      return
+    }
+
+    const topN = items.slice(0, 5)
+
+    if (!auth.address) {
+      const infoMsg: Message = {
+        id: (Date.now() + 4).toString(),
+        text: `등록된 주소가 없어 기본 위치(${sigun}) 기준으로 추천합니다. 회원정보에서 주소를 추가하시면 더 정확해져요.`,
+        sender: 'bot',
+        timestamp: new Date(),
+        kind: 'text'
+      }
+      setMessages(prev => {
+        const next = [...prev, infoMsg]
+        persistMessages(next, activeSessionId)
+        return next
+      })
+    }
+
+    setMessages(prev => {
+      const next = prev.map(m => m.id === loadingId
+        ? { ...m, text: '', kind: 'medicalCards' as const, payload: { sigun, items: topN } as MedicalBlockPayload }
+        : m)
+      persistMessages(next, activeSessionId)
+      return next
+    })
+  }
   useEffect(() => {
     scrollToBottom()
   }, [messages])
@@ -241,6 +416,18 @@ const ChatBot = () => {
           } else if (event.type === 'suggestions') {
             const sug = event.suggestions.map(s => `• ${s}`).join('\n')
             assembled += (assembled ? '\n\n' : '') + sug
+          } else if ((event as any).type === 'action') {
+            const action = event as any
+            if (action.name === 'postnatal.recommend') {
+              disableLocalPostnatalRef.current = true
+              ;(async () => {
+                await triggerPostnatalRecommend(activeSessionId)
+              })()
+            } else if (action.name === 'medical.recommend') {
+              ;(async () => {
+                await triggerMedicalRecommend(activeSessionId)
+              })()
+            }
           } else {
             // ignore: decision/start/end
           }
@@ -279,103 +466,10 @@ const ChatBot = () => {
     // 산후조리원 의도 감지 및 게이트 처리 (병렬)
     ;(async () => {
       try {
+        if (disableLocalPostnatalRef.current) return
         if (!detectPostnatalCareIntent(text)) return
         if (currentSessionRef.current !== activeSessionId) return
-
-        // 미로그인: 로그인 유도 버블
-        if (!auth.userId) {
-          const loginMsg: Message = {
-            id: (Date.now() + 2).toString(),
-            text: '산후조리원 정보는 로그인 후 이용하실 수 있습니다.',
-            sender: 'bot',
-            timestamp: new Date(),
-            kind: 'ctaLogin',
-            payload: { cta: 'login' }
-          }
-          setMessages(prev => {
-            const next = [...prev, loginMsg]
-            persistMessages(next, activeSessionId)
-            return next
-          })
-          return
-        }
-
-        // 로그인: 주소 기반 조회 (로딩 버블 먼저 표시)
-        const loadingId = (Date.now() + 12).toString()
-        const loadingMsg: Message = {
-          id: loadingId,
-          text: '산후조리원 정보를 불러오는 중...'
-            + '\n네트워크 상황에 따라 최대 수 초가 소요될 수 있습니다.',
-          sender: 'bot',
-          timestamp: new Date(),
-          kind: 'postnatalLoading'
-        }
-        setMessages(prev => {
-          const next = [...prev, loadingMsg]
-          persistMessages(next, activeSessionId)
-          return next
-        })
-
-        // 주소 기반 조회
-        const fallbackSigun = (import.meta as any).env?.VITE_DEFAULT_SIGUN || '안산시'
-        const sigun = extractSigunFromAddress(auth.address) || fallbackSigun
-        const userLoc: Coordinates | null = await geocodeAddress(auth.address || '')
-
-        let ranked: Array<PostnatalCareItem & { distanceKm?: number | null }> = []
-        try {
-          const res = await fetchPostnatalCare({ sigun, size: 50 })
-          const list = Array.isArray(res.items) ? res.items : []
-          if (userLoc) {
-            ranked = list
-              .map(it => {
-                const d = it.coordinates ? distanceKm(userLoc, it.coordinates) : null
-                return { ...it, distanceKm: d }
-              })
-              .sort((a, b) => {
-                const da = a.distanceKm ?? Number.POSITIVE_INFINITY
-                const db = b.distanceKm ?? Number.POSITIVE_INFINITY
-                return da - db
-              })
-          } else {
-            ranked = list
-          }
-        } catch (e) {
-          // 데이터 실패: 로딩 버블을 에러 텍스트로 교체
-          setMessages(prev => {
-            const next = prev.map(m => m.id === loadingId
-              ? { ...m, kind: 'text' as const, text: '죄송합니다. 산후조리원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }
-              : m)
-            persistMessages(next, activeSessionId)
-            return next
-          })
-          return
-        }
-
-        const topN = ranked.slice(0, 5)
-
-        // 주소 부재 시 안내 버블 추가 (기본 시군 기준 표시)
-        if (!auth.address) {
-          const infoMsg: Message = {
-            id: (Date.now() + 3.5).toString(),
-            text: `등록된 주소가 없어 기본 위치(${sigun}) 기준으로 추천합니다. 회원정보에서 주소를 추가하시면 거리순 추천을 받을 수 있어요.`,
-            sender: 'bot',
-            timestamp: new Date(),
-            kind: 'text'
-          }
-          setMessages(prev => {
-            const next = [...prev, infoMsg]
-            persistMessages(next, activeSessionId)
-            return next
-          })
-        }
-        // 로딩 버블을 결과 카드로 교체
-        setMessages(prev => {
-          const next = prev.map(m => m.id === loadingId
-            ? { ...m, text: '', kind: 'postnatalCards' as const, payload: { sigun, items: topN } as PostnatalBlockPayload }
-            : m)
-          persistMessages(next, activeSessionId)
-          return next
-        })
+        await triggerPostnatalRecommend(activeSessionId)
       } catch {
         // 조용히 무시 (의도 감지/지오코딩 등 비핵심 실패)
       }
@@ -417,6 +511,11 @@ const ChatBot = () => {
       const query = encodeURIComponent(`${item.name} ${item.address}`)
       window.open(`https://map.naver.com/p/search/${query}`, '_blank', 'noopener')
     }
+  }
+
+  const openMapForFacility = (item: MedicalFacility) => {
+    const query = encodeURIComponent(`${item.name} ${item.address}`)
+    window.open(`https://map.naver.com/p/search/${query}`, '_blank', 'noopener')
   }
 
   // 간단한 마크다운(**굵게**)과 줄바꿈 렌더링
@@ -609,6 +708,61 @@ const ChatBot = () => {
                     )}
 
                     {message.kind === 'postnatalLoading' && (
+                      <div className="bg-gray-100 text-gray-800 p-4 rounded-2xl w-full">
+                        <p className="text-sm mb-3">{renderTextWithBasicMarkdown(message.text)}</p>
+                        <div className="animate-pulse space-y-3">
+                          {[0,1,2].map(i => (
+                            <div key={i} className="rounded-lg border border-gray-200 bg-white p-3">
+                              <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                              <div className="h-3 bg-gray-200 rounded w-1/2 mt-2"></div>
+                              <div className="h-3 bg-gray-200 rounded w-1/3 mt-1"></div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {message.kind === 'medicalCards' && message.payload && (
+                      <div className="bg-gray-100 text-gray-800 p-4 rounded-2xl w-full">
+                        {(() => {
+                          const payload: any = message.payload
+                          return (
+                            <div className="mb-3">
+                              <p className="text-sm font-semibold text-gray-800">근처 의료시설 추천 ({payload.sigun})</p>
+                              <p className="text-xs text-gray-500">주소 좌표 확인이 어려워 거리 순 정렬 없이 보여드립니다.</p>
+                            </div>
+                          )
+                        })()}
+                        <div className="grid grid-cols-1 gap-3">
+                          {((message.payload as any).items || []).map((it: any, idx: number) => (
+                            <div key={`${it.id}-${idx}`} className="rounded-lg border border-gray-200 bg-white p-3">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-gray-900">{it.name}</span>
+                                    {it.category && (
+                                      <span className="text-[11px] text-gray-500">{it.category}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-gray-600 mt-1">{it.address}</div>
+                                  <div className="text-xs text-gray-500 mt-0.5">{it.phone || '-'}</div>
+                                </div>
+                                <div>
+                                  <button
+                                    onClick={() => openMapForFacility(it)}
+                                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded"
+                                  >
+                                    지도 보기
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {message.kind === 'medicalLoading' && (
                       <div className="bg-gray-100 text-gray-800 p-4 rounded-2xl w-full">
                         <p className="text-sm mb-3">{renderTextWithBasicMarkdown(message.text)}</p>
                         <div className="animate-pulse space-y-3">
