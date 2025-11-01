@@ -1,24 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  Send, 
-  Bot, 
-  User, 
-  Heart, 
-  Baby,
-  Calendar,
-  Clock,
-  ThumbsUp,
-  Copy,
-  Sparkles
-} from 'lucide-react'
+import { Send, Bot, User, Clock, Info } from 'lucide-react'
 
 interface Message {
   id: string
   text: string
   sender: 'user' | 'bot'
   timestamp: Date
-  category?: string
 }
 
 const ChatBot = () => {
@@ -27,12 +15,12 @@ const ChatBot = () => {
       id: '1',
       text: '안녕하세요! 안산맘케어 AI 챗봇 상담입니다. 임신과 출산에 관한 모든 질문에 답변해 드립니다. 무엇이 궁금하신가요?',
       sender: 'bot',
-      timestamp: new Date(),
-      category: '인사'
+      timestamp: new Date()
     }
   ])
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [isInfoTooltipVisible, setIsInfoTooltipVisible] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -52,6 +40,9 @@ const ChatBot = () => {
     '태교는 어떻게 하나요?',
     '임신 중 영양제는 어떤 것을 먹어야 할까요?'
   ]
+  const hasUserMessages = messages.some(message => message.sender === 'user')
+  const showSuggestedQuestions = !hasUserMessages
+  const messagesContainerHeightClass = showSuggestedQuestions ? 'h-[36rem]' : 'h-[42rem]'
 
   const addMessage = (text: string) => {
     if (text.trim() === '') return
@@ -71,8 +62,7 @@ const ChatBot = () => {
         id: (Date.now() + 1).toString(),
         text: generateBotResponse(text),
         sender: 'bot',
-        timestamp: new Date(),
-        category: '의학정보'
+        timestamp: new Date()
       }
       setMessages(prev => [...prev, botMessage])
       setIsTyping(false)
@@ -113,7 +103,11 @@ const ChatBot = () => {
   }
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    return date.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
   }
 
   return (
@@ -122,7 +116,7 @@ const ChatBot = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-xl overflow-hidden"
+          className="relative bg-white rounded-2xl shadow-xl"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-primary-500 to-secondary-500 text-white p-6">
@@ -143,7 +137,7 @@ const ChatBot = () => {
           {/* Chat Messages */}
           <div
             ref={messagesContainerRef}
-            className="h-[36rem] overflow-y-auto p-6 space-y-4"
+            className={`${messagesContainerHeightClass} overflow-y-auto p-6 space-y-4`}
           >
             {messages.map((message) => (
               <motion.div
@@ -152,7 +146,7 @@ const ChatBot = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex items-start space-x-2 max-w-xs lg:max-w-2xl ${
+                <div className={`flex items-end space-x-2 max-w-xs lg:max-w-2xl ${
                   message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''
                 }`}>
                   <div className={`p-2 rounded-full ${
@@ -164,25 +158,26 @@ const ChatBot = () => {
                       <Bot className="h-4 w-4 text-secondary-600" />
                     )}
                   </div>
-                  <div className={`p-4 rounded-2xl ${
-                    message.sender === 'user' 
-                      ? 'bg-primary-500 text-white' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    <p className="whitespace-pre-line text-sm">{message.text}</p>
-                    <div className={`flex items-center justify-between mt-2 text-xs ${
-                      message.sender === 'user' ? 'text-primary-200' : 'text-gray-500'
+                  <div
+                    className={`flex items-end gap-2 ${
+                      message.sender === 'user' ? 'flex-row-reverse' : ''
+                    }`}
+                  >
+                    <div className={`p-4 rounded-2xl ${
+                      message.sender === 'user'
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-gray-100 text-gray-800'
                     }`}>
-                      <span className="flex items-center space-x-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatTime(message.timestamp)}</span>
-                      </span>
-                      {message.category && (
-                        <span className="flex items-center space-x-1">
-                          <Sparkles className="h-3 w-3" />
-                          <span>{message.category}</span>
-                        </span>
-                      )}
+                      <p className="whitespace-pre-line text-sm">{message.text}</p>
+                    </div>
+                    <div
+                      className={`text-xs ${
+                        message.sender === 'user'
+                          ? 'text-primary-200 text-right'
+                          : 'text-gray-500 text-left'
+                      }`}
+                    >
+                      {formatTime(message.timestamp)}
                     </div>
                   </div>
                 </div>
@@ -224,23 +219,25 @@ const ChatBot = () => {
           </div>
 
           {/* Suggested Questions */}
-          <div className="px-6 pb-4">
-            <p className="text-sm text-gray-600 mb-2">추천 질문:</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((question, index) => (
-                <motion.button
-                  key={index}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ type: 'tween', duration: 0.15 }}
-                  onClick={() => handleSuggestedQuestion(question)}
-                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors duration-150"
-                >
-                  {question}
-                </motion.button>
-              ))}
+          {showSuggestedQuestions && (
+            <div className="px-6 pb-4">
+              <p className="text-sm text-gray-600 mb-2">추천 질문:</p>
+              <div className="flex flex-wrap gap-2">
+                {suggestedQuestions.map((question, index) => (
+                  <motion.button
+                    key={index}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: 'tween', duration: 0.15 }}
+                    onClick={() => handleSuggestedQuestion(question)}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    {question}
+                  </motion.button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Input Area */}
           <div className="border-t border-gray-200 p-4">
@@ -253,12 +250,38 @@ const ChatBot = () => {
                 placeholder="궁금한 점을 질문해주세요..."
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+              <div className="relative">
+                {isInfoTooltipVisible && (
+                  <div
+                    id="info-tooltip"
+                    className="absolute bottom-full left-1/2 z-20 mb-3 w-64 -translate-x-1/2 rounded-lg bg-gray-900/95 p-3 text-xs text-gray-100 shadow-lg"
+                  >
+                    AI 챗봇 상담은 일반적인 정보 제공을 위한 것이며, 의료 진단이나 치료를 대체하지 않습니다. 긴급 상황이나 전문적인 상담이 필요하면 반드시 의료진과 상의하세요.
+                    <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900/95" />
+                  </div>
+                )}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'tween', duration: 0.15 }}
+                  className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors duration-150"
+                  title="안내 사항"
+                  onMouseEnter={() => setIsInfoTooltipVisible(true)}
+                  onMouseLeave={() => setIsInfoTooltipVisible(false)}
+                  onFocus={() => setIsInfoTooltipVisible(true)}
+                  onBlur={() => setIsInfoTooltipVisible(false)}
+                  aria-describedby={isInfoTooltipVisible ? 'info-tooltip' : undefined}
+                >
+                  <Info className="h-5 w-5" />
+                </motion.button>
+              </div>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 transition={{ type: 'tween', duration: 0.15 }}
                 onClick={handleSendMessage}
-                className="bg-primary-500 text-white p-3 rounded-full hover:bg-primary-600 transition-colors duration-150"
+                className="flex h-12 w-12 items-center justify-center bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors duration-150"
               >
                 <Send className="h-5 w-5" />
               </motion.button>
@@ -266,24 +289,6 @@ const ChatBot = () => {
           </div>
         </motion.div>
 
-        {/* Info Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4"
-        >
-          <div className="flex items-start space-x-3">
-            <Heart className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-blue-900 mb-1">안내 사항</h3>
-              <p className="text-sm text-blue-800">
-                AI 챗봇 상담은 일반적인 정보 제공을 목적으로 하며, 실제 의학적 진단이나 치료를 대체할 수 없습니다.
-                긴급한 상황이나 전문적인 진료가 필요한 경우 반드시 의사와 상담하세요.
-              </p>
-            </div>
-          </div>
-        </motion.div>
       </div>
     </div>
   )
