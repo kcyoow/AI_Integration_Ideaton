@@ -38,11 +38,11 @@
 @layer components {
   /* 정부 사이트 스타일 버튼 */
   .btn-primary {
-    @apply bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-all duration-150 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
+    @apply bg-primary-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-600 transition-all duration-150 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
   }
   
   .btn-secondary {
-    @apply bg-government-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-government-700 transition-all duration-150 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
+    @apply bg-secondary-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-secondary-600 transition-all duration-150 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
   }
   
   .btn-outline {
@@ -72,20 +72,20 @@
 
   /* 정부 사이트 스타일 배경 */
   .gradient-bg {
-    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 50%, #1d4ed8 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   }
   
   .gradient-bg-light {
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+    background: linear-gradient(135deg, #fdf2f8 0%, #fbcfe8 50%, #f9a8d4 100%);
   }
   
   .gradient-bg-government {
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+    background: linear-gradient(135deg, #fdf2f8 0%, #e0f2fe 50%, #c4b5fd 100%);
   }
 
   /* 정부 사이트 스타일 텍스트 */
   .text-gradient {
-    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

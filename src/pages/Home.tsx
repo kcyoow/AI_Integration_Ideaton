@@ -1,31 +1,24 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useInView } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { 
   Baby, 
   Heart, 
   MapPin, 
   Building2, 
   Users, 
-  MessageCircle,
   Stethoscope,
   ArrowRight,
   Star,
   Shield,
   Clock,
   CheckCircle,
-  Award,
-  TrendingUp,
-  Phone,
-  Mail,
-  Map,
   Calendar,
   FileText,
   HelpCircle,
   Activity,
   Zap,
-  Target,
-  Users2
+  Target
 } from 'lucide-react'
 
 const Home = () => {
@@ -141,7 +134,7 @@ const Home = () => {
     <div className="min-h-screen bg-gradient-bg-government">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-700 to-government-900"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-secondary-500 to-secondary-700"></div>
         <div className="absolute inset-0 bg-black opacity-10"></div>
         
         {/* Animated Background Elements */}
@@ -186,7 +179,7 @@ const Home = () => {
             >
               안산맘케어
               <motion.span 
-                className="block text-3xl md:text-4xl mt-4 font-normal text-blue-100"
+                className="block text-3xl md:text-4xl mt-4 font-normal text-secondary-100"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.8 }}
@@ -196,7 +189,7 @@ const Home = () => {
             </motion.h1>
             
             <motion.p 
-              className="text-xl md:text-2xl text-blue-100 mb-12 max-w-4xl mx-auto leading-relaxed"
+              className="text-xl md:text-2xl text-secondary-100 mb-12 max-w-4xl mx-auto leading-relaxed"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.7, duration: 0.8 }}
@@ -214,7 +207,7 @@ const Home = () => {
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "tween", duration: 0.15 }}>
                 <Link
                   to="/chatbot"
-                  className="bg-white text-primary-700 px-10 py-5 rounded-full font-bold text-lg hover:bg-blue-50 transition-all duration-150 shadow-2xl hover:shadow-blue-500/25 flex items-center space-x-3 group"
+                  className="bg-white text-primary-700 px-10 py-5 rounded-full font-bold text-lg hover:bg-secondary-50 transition-all duration-150 shadow-2xl hover:shadow-secondary-500/25 flex items-center space-x-3 group"
                 >
                   <Stethoscope className="h-6 w-6 group-hover:animate-pulse" />
                   <span>지금 바로 시작하기</span>
@@ -242,10 +235,11 @@ const Home = () => {
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-government-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               주요 서비스
             </h2>
             <p className="text-xl text-gray-600">
@@ -261,6 +255,7 @@ const Home = () => {
                   key={index}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
                   whileHover={{ scale: 1.05, y: -5 }}
                   className="text-center p-6 rounded-2xl bg-gradient-bg-light hover:shadow-xl transition-all duration-150 group cursor-pointer"
@@ -272,7 +267,7 @@ const Home = () => {
                   >
                     <Icon className="h-8 w-8 text-white" />
                   </motion.div>
-                  <div className="text-2xl font-bold text-government-900 mb-2">
+                  <div className="text-2xl font-bold text-gray-900 mb-2">
                     {service.count}
                   </div>
                   <div className="text-lg font-semibold text-gray-700 mb-3">
@@ -294,10 +289,11 @@ const Home = () => {
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-government-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               공지사항 및 뉴스
             </h2>
             <p className="text-xl text-gray-600">
@@ -318,13 +314,14 @@ const Home = () => {
                 </thead>
                 <tbody>
                   {announcements.map((announcement, index) => (
-                    <motion.tr
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="table-row hover:bg-primary-50 cursor-pointer group"
-                    >
+                  <motion.tr
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                    className="table-row hover:bg-primary-50 cursor-pointer group"
+                  >
                       <td className="table-cell">
                         <span className={`badge ${
                           announcement.category === '정책뉴스' ? 'badge-primary' :
@@ -335,7 +332,7 @@ const Home = () => {
                           {announcement.category}
                         </span>
                       </td>
-                      <td className="table-cell font-medium text-government-800 group-hover:text-primary-700 transition-colors duration-150">
+                      <td className="table-cell font-medium text-gray-800 group-hover:text-primary-700 transition-colors duration-150">
                         {announcement.title}
                       </td>
                       <td className="table-cell text-gray-600">
@@ -360,6 +357,7 @@ const Home = () => {
             <motion.div
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
               transition={{ delay: 0.5 }}
               className="p-6 border-t border-gray-200 text-center"
             >
@@ -378,13 +376,14 @@ const Home = () => {
       {/* Features Section */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-government-900 mb-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               맞춤형 서비스
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -400,6 +399,7 @@ const Home = () => {
                   key={index}
                   initial={{ opacity: 0, y: 50 }}
                   whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
                   transition={{ delay: index * 0.15, type: "tween", duration: 0.15 }}
                   whileHover={{ y: -10, scale: 1.02 }}
                   className="group cursor-pointer"
@@ -415,7 +415,7 @@ const Home = () => {
                         <Icon className="h-10 w-10 text-white" />
                       </motion.div>
                       
-                      <h3 className="text-2xl font-bold text-government-900 mb-4 group-hover:text-primary-700 transition-colors duration-150">
+                      <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-primary-700 transition-colors duration-150">
                         {feature.title}
                       </h3>
                       
@@ -451,10 +451,11 @@ const Home = () => {
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-government-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               왜 안산맘케어인가요?
             </h2>
             <p className="text-xl text-gray-600">
@@ -470,9 +471,10 @@ const Home = () => {
                   key={index}
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
                   transition={{ delay: index * 0.1, type: "tween", duration: 0.15 }}
                   whileHover={{ scale: 1.05, rotate: 2 }}
-                  className="text-center p-8 rounded-2xl bg-gradient-to-br from-primary-50 to-blue-100 hover:shadow-xl transition-all duration-150"
+                  className="text-center p-8 rounded-2xl bg-gradient-to-br from-primary-50 to-secondary-100 hover:shadow-xl transition-all duration-150"
                 >
                   <motion.div
                     animate={{ y: [0, -10, 0] }}
@@ -481,7 +483,7 @@ const Home = () => {
                   >
                     <Icon className="h-8 w-8 text-white" />
                   </motion.div>
-                  <h3 className="text-xl font-bold text-government-900 mb-3">
+                  <h3 className="text-xl font-bold text-gray-900 mb-3">
                     {benefit.title}
                   </h3>
                   <p className="text-gray-600 leading-relaxed">
@@ -515,6 +517,7 @@ const Home = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
             <motion.div
@@ -530,7 +533,7 @@ const Home = () => {
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
               지금 바로 안산맘케어를 시작하세요
             </h2>
-            <p className="text-xl text-blue-100 mb-12 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl text-secondary-100 mb-12 max-w-3xl mx-auto leading-relaxed">
               전문가의 상담과 맞춤형 정보로 더 안전하고 편안한 임신/육아 생활을 경험해보세요<br />
               수많은 맘들이 이미 경험한 변화를 직접 확인해보세요
             </p>
@@ -539,12 +542,13 @@ const Home = () => {
               className="flex flex-col sm:flex-row gap-4 justify-center items-center"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
               transition={{ delay: 0.3 }}
             >
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "tween", duration: 0.15 }}>
                 <Link
                   to="/policy"
-                  className="bg-white text-primary-700 px-10 py-5 rounded-full font-bold text-lg hover:bg-blue-50 transition-all duration-150 shadow-2xl hover:shadow-white/25 flex items-center space-x-3"
+                  className="bg-white text-primary-700 px-10 py-5 rounded-full font-bold text-lg hover:bg-secondary-50 transition-all duration-150 shadow-2xl hover:shadow-white/25 flex items-center space-x-3"
                 >
                   <Heart className="h-6 w-6" />
                   <span>맞춤 정책 확인하기</span>

@@ -6,14 +6,10 @@ import {
   Heart, 
   MapPin, 
   Building2, 
-  Users, 
-  MessageCircle,
+  Users,
   Menu,
   X,
-  Stethoscope,
-  ChevronDown,
-  Phone,
-  Clock
+  Stethoscope
 } from 'lucide-react'
 
 const Navbar = () => {
@@ -40,34 +36,6 @@ const Navbar = () => {
 
   return (
     <>
-      {/* 최상단 정보 바 */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="bg-government-900 text-white py-2 px-4 text-sm"
-      >
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-1">
-              <Clock className="h-4 w-4" />
-              <span>평일 09:00 - 18:00 운영</span>
-            </div>
-            <div className="hidden md:flex items-center space-x-1">
-              <Phone className="h-4 w-4" />
-              <span>상담전화: 1544-1234</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link to="/policy" className="hover:text-primary-300 transition-colors duration-150">
-              정책정보
-            </Link>
-            <Link to="/community" className="hover:text-primary-300 transition-colors duration-150">
-              고객지원
-            </Link>
-          </div>
-        </div>
-      </motion.div>
-
       {/* 메인 네비게이션 */}
       <motion.nav
         initial={{ y: -100 }}
@@ -86,7 +54,7 @@ const Navbar = () => {
                 <motion.div
                   whileHover={{ scale: 1.1, rotate: 5 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-primary-600 p-3 rounded-xl shadow-md group-hover:shadow-lg transition-shadow duration-150"
+                  className="bg-primary-500 p-3 rounded-xl shadow-md group-hover:shadow-lg transition-shadow duration-150"
                 >
                   <Baby className="h-6 w-6 text-white" />
                 </motion.div>
