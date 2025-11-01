@@ -56,9 +56,15 @@ const ChatBot = () => {
   const [isTyping, setIsTyping] = useState(false)
   const [typingSessionId, setTypingSessionId] = useState<string | null>(null)
   const [isInfoTooltipVisible, setIsInfoTooltipVisible] = useState(false)
+  const [busyCount, setBusyCount] = useState(0)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const currentSessionRef = useRef<string | null>(null)
   const disableLocalPostnatalRef = useRef<boolean>(false)
+  const postnatalInFlightRef = useRef<boolean>(false)
+  const medicalInFlightRef = useRef<boolean>(false)
+  const pendingCardTasksRef = useRef<number>(0)
+
+  const isChatBlocked = busyCount > 0
 
   useEffect(() => {
     currentSessionRef.current = currentSessionId
@@ -126,6 +132,9 @@ const ChatBot = () => {
 
   // 서버 action 또는 로컬 의도에 의해 호출되는 산후조리원 추천 플로우
   const triggerPostnatalRecommend = async (activeSessionId: string) => {
+    if (postnatalInFlightRef.current) return
+    postnatalInFlightRef.current = true
+    try {
     // 미로그인: 로그인 유도 버블
     if (!auth.userId) {
       const loginMsg: Message = {
@@ -215,10 +224,16 @@ const ChatBot = () => {
       persistMessages(next, activeSessionId)
       return next
     })
+    } finally {
+      postnatalInFlightRef.current = false
+    }
   }
 
   // 서버 action에 의해 호출되는 의료시설 추천 플로우
   const triggerMedicalRecommend = async (activeSessionId: string) => {
+    if (medicalInFlightRef.current) return
+    medicalInFlightRef.current = true
+    try {
     if (!auth.userId) {
       const loginMsg: Message = {
         id: (Date.now() + 2).toString(),
@@ -291,6 +306,9 @@ const ChatBot = () => {
       persistMessages(next, activeSessionId)
       return next
     })
+    } finally {
+      medicalInFlightRef.current = false
+    }
   }
   useEffect(() => {
     scrollToBottom()
@@ -383,17 +401,7 @@ const ChatBot = () => {
     setTypingSessionId(activeSessionId)
     touchSession(activeSessionId, text)
 
-    const botMsgId = (Date.now() + 1).toString()
-    const botPlaceholder: Message = {
-      id: botMsgId,
-      text: '',
-      sender: 'bot',
-      timestamp: new Date()
-    }
-    setMessages(prev => {
-      const next = [...prev, botPlaceholder]
-      return next
-    })
+    let botMsgId: string | null = null
 
     const priorStored = loadSessionMessages(storageUserId, activeSessionId)
     const prior: Message[] = fromStored(priorStored)
@@ -403,6 +411,7 @@ const ChatBot = () => {
     }))
 
     ;(async () => {
+      setBusyCount(prev => prev + 1)
       let assembled = ''
       try {
         let contentStarted = false
@@ -421,40 +430,85 @@ const ChatBot = () => {
             if (action.name === 'postnatal.recommend') {
               disableLocalPostnatalRef.current = true
               ;(async () => {
-                await triggerPostnatalRecommend(activeSessionId)
+                setBusyCount(prev => prev + 1)
+                pendingCardTasksRef.current += 1
+                try {
+                  await triggerPostnatalRecommend(activeSessionId)
+                } finally {
+                  pendingCardTasksRef.current = Math.max(0, pendingCardTasksRef.current - 1)
+                  setBusyCount(prev => Math.max(0, prev - 1))
+                }
               })()
             } else if (action.name === 'medical.recommend') {
               ;(async () => {
-                await triggerMedicalRecommend(activeSessionId)
+                setBusyCount(prev => prev + 1)
+                pendingCardTasksRef.current += 1
+                try {
+                  await triggerMedicalRecommend(activeSessionId)
+                } finally {
+                  pendingCardTasksRef.current = Math.max(0, pendingCardTasksRef.current - 1)
+                  setBusyCount(prev => Math.max(0, prev - 1))
+                }
               })()
             }
           } else {
             // ignore: decision/start/end
           }
 
-          if (!contentStarted && assembled.trim() !== '') {
+          if (!contentStarted && assembled.trim() !== '' && pendingCardTasksRef.current === 0) {
             contentStarted = true
             if (currentSessionRef.current === activeSessionId) {
               setIsTyping(false)
               setTypingSessionId(null)
             }
+            // 최초 텍스트가 시작되는 시점에 메시지 생성
+            const newId = (Date.now() + 1).toString()
+            botMsgId = newId
+            const newMsg: Message = { id: newId, text: assembled, sender: 'bot', timestamp: new Date() }
+            setMessages(prev => {
+              const next = [...prev, newMsg]
+              persistMessages(next, activeSessionId)
+              return next
+            })
+          } else if (botMsgId) {
+            setMessages(prev => {
+              const next = prev.map(m => m.id === botMsgId ? { ...m, text: assembled } : m)
+              persistMessages(next, activeSessionId)
+              return next
+            })
           }
-
+        }
+      } catch (err) {
+        const fallback = '죄송합니다. 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+        assembled = assembled || fallback
+      } finally {
+        setBusyCount(prev => Math.max(0, prev - 1))
+        // 카드가 아직 준비되지 않았다면 최대 2초까지 대기 후 메시지를 생성
+        if (!botMsgId) {
+          const start = Date.now()
+          const waitLoop = async () => {
+            while (pendingCardTasksRef.current > 0 && Date.now() - start < 2000) {
+              await new Promise(r => setTimeout(r, 100))
+            }
+          }
+          await waitLoop()
+          if (currentSessionRef.current === activeSessionId && !botMsgId) {
+            const newId = (Date.now() + 1).toString()
+            botMsgId = newId
+            const newMsg: Message = { id: newId, text: assembled, sender: 'bot', timestamp: new Date() }
+            setMessages(prev => {
+              const next = [...prev, newMsg]
+              persistMessages(next, activeSessionId)
+              return next
+            })
+          }
+        } else {
           setMessages(prev => {
             const next = prev.map(m => m.id === botMsgId ? { ...m, text: assembled } : m)
             persistMessages(next, activeSessionId)
             return next
           })
         }
-      } catch (err) {
-        const fallback = '죄송합니다. 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
-        assembled = assembled || fallback
-      } finally {
-        setMessages(prev => {
-          const next = prev.map(m => m.id === botMsgId ? { ...m, text: assembled } : m)
-          persistMessages(next, activeSessionId)
-          return next
-        })
         touchSession(activeSessionId)
         if (currentSessionRef.current === activeSessionId) {
           setIsTyping(false)
@@ -466,10 +520,19 @@ const ChatBot = () => {
     // 산후조리원 의도 감지 및 게이트 처리 (병렬)
     ;(async () => {
       try {
+        // 서버 action을 잠시 기다렸다가(예: 800ms) 오지 않으면 백업 로직 수행
+        await new Promise(resolve => setTimeout(resolve, 800))
         if (disableLocalPostnatalRef.current) return
         if (!detectPostnatalCareIntent(text)) return
         if (currentSessionRef.current !== activeSessionId) return
-        await triggerPostnatalRecommend(activeSessionId)
+        setBusyCount(prev => prev + 1)
+        pendingCardTasksRef.current += 1
+        try {
+          await triggerPostnatalRecommend(activeSessionId)
+        } finally {
+          pendingCardTasksRef.current = Math.max(0, pendingCardTasksRef.current - 1)
+          setBusyCount(prev => Math.max(0, prev - 1))
+        }
       } catch {
         // 조용히 무시 (의도 감지/지오코딩 등 비핵심 실패)
       }
@@ -869,7 +932,8 @@ const ChatBot = () => {
                   }
                 }}
                 placeholder="궁금한 점을 질문해주세요..."
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                disabled={isChatBlocked}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <div className="relative">
                 {isInfoTooltipVisible && (
@@ -902,7 +966,8 @@ const ChatBot = () => {
                 whileTap={{ scale: 0.95 }}
                 transition={{ type: 'tween', duration: 0.15 }}
                 onClick={handleSendMessage}
-                className="flex h-12 w-12 items-center justify-center bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors duration-150"
+                disabled={isChatBlocked}
+                className="flex h-12 w-12 items-center justify-center bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="h-5 w-5" />
               </motion.button>
