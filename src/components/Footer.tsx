@@ -15,7 +15,7 @@ const Footer = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <Baby className="h-8 w-8 text-primary-400" />
-              <span className="text-2xl font-bold">안산맘케어</span>
+              <span className="text-2xl font-bold">AN:NEST</span>
             </div>
             <p className="text-gray-300 mb-4">
               안산시 임산부와 영유아 가족을 위한 종합 지원 서비스.<br />
@@ -78,7 +78,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-          <p>&copy; 2024 안산맘케어. All rights reserved.</p>
+          <p>&copy; 2024 AN:NEST. All rights reserved.</p>
         </div>
       </div>
     </motion.footer>

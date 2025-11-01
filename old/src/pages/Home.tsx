@@ -71,7 +71,7 @@ const Home = () => {
               <Baby className="h-20 w-20 mx-auto" />
             </motion.div>
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
-              안산맘케어
+              AN:NEST
             </h1>
             <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto">
               안산시 임산부와 영유아 가족을 위한 종합 지원 서비스
@@ -168,7 +168,7 @@ const Home = () => {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl font-bold mb-4">
-              지금 바로 안산맘케어를 시작하세요
+              지금 바로 AN:NEST를 시작하세요
             </h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               전문가의 상담과 맞춤형 정보로 더 안전하고 편안한 임신/육아 생활을 경험해보세요

@@ -80,7 +80,7 @@ const Home = () => {
       importance: 'normal'
     },
     {
-      title: '안산맘케어 모바일 앱 베타버전 출시',
+      title: 'AN:NEST 모바일 앱 베타버전 출시',
       date: '2024.10.20',
       category: '새소식',
       importance: 'normal'
@@ -137,7 +137,7 @@ const Home = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.8 }}
             >
-              안산맘케어
+              AN:NEST
               <motion.span 
                 className="block text-3xl md:text-4xl mt-4 font-normal text-secondary-100"
                 initial={{ opacity: 0 }}
@@ -362,7 +362,7 @@ const Home = () => {
             className="text-center mb-16"
           >
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              왜 안산맘케어인가요?
+              왜 AN:NEST인가요?
             </h2>
             <p className="text-xl text-gray-600">
               전문성과 신뢰성을 바탕으로 최고의 서비스를 제공합니다

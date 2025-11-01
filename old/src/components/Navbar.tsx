@@ -42,7 +42,7 @@ const Navbar = () => {
               >
                 <Baby className="h-6 w-6 text-white" />
               </motion.div>
-              <span className="text-xl font-bold text-gradient">안산맘케어</span>
+              <span className="text-xl font-bold text-gradient">AN:NEST</span>
             </Link>
           </div>
 

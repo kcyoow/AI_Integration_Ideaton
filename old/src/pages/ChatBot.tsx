@@ -25,7 +25,7 @@ const ChatBot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '안녕하세요! 안산맘케어 AI 의학상담 봇입니다. 임신과 출산에 관한 모든 질문에 답변해 드립니다. 무엇이 궁금하신가요?',
+      text: '안녕하세요! AN:NEST AI 의학상담 봇입니다. 임신과 출산에 관한 모든 질문에 답변해 드립니다. 무엇이 궁금하신가요?',
       sender: 'bot',
       timestamp: new Date(),
       category: '인사'

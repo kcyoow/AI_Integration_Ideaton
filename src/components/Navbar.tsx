@@ -60,7 +60,7 @@ const Navbar = () => {
                   <Baby className="h-6 w-6 text-white" />
                 </motion.div>
                 <div className="flex flex-col">
-                  <span className="text-xl font-bold text-gradient">안산맘케어</span>
+                  <span className="text-xl font-bold text-gradient">AN:NEST</span>
                   <span className="text-xs text-gray-500">임산부와 영유아 가족을 위한 종합 지원</span>
                 </div>
               </Link>
