@@ -338,8 +338,9 @@ const PostpartumCare = () => {
                   key={type.id}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'tween', duration: 0.15 }}
                   onClick={() => setSelectedType(type.id)}
-                  className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm transition-colors duration-200 ${
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm transition-colors duration-150 ${
                     selectedType === type.id
                       ? 'bg-primary-500 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -474,7 +475,8 @@ const PostpartumCare = () => {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-200"
+                    transition={{ type: 'tween', duration: 0.15 }}
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-150"
                   >
                     <Navigation className="inline-block h-4 w-4 mr-1" />
                     지도 보기
@@ -482,6 +484,7 @@ const PostpartumCare = () => {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
+                    transition={{ type: 'tween', duration: 0.15 }}
                     className="btn-primary text-sm px-4 py-2"
                   >
                     상세 정보 및 예약

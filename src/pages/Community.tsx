@@ -274,6 +274,7 @@ const Community = () => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              transition={{ type: 'tween', duration: 0.15 }}
               className="btn-primary flex items-center justify-center space-x-2"
             >
               <Plus className="h-5 w-5" />
@@ -294,8 +295,9 @@ const Community = () => {
                     key={category.id}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    transition={{ type: 'tween', duration: 0.15 }}
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors duration-200 ${
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors duration-150 ${
                       selectedCategory === category.id
                         ? 'bg-primary-500 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -338,7 +340,7 @@ const Community = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors duration-150">
                       {question.title}
                     </h3>
                     {question.hasAcceptedAnswer && (

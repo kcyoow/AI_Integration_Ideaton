@@ -26,21 +26,21 @@ const Footer = () => {
               <motion.a
                 href="#"
                 whileHover={{ scale: 1.1 }}
-                className="text-gray-400 hover:text-primary-400 transition-colors"
+                className="text-gray-400 hover:text-primary-400 transition-colors duration-150"
               >
                 <Phone className="h-5 w-5" />
               </motion.a>
               <motion.a
                 href="#"
                 whileHover={{ scale: 1.1 }}
-                className="text-gray-400 hover:text-primary-400 transition-colors"
+                className="text-gray-400 hover:text-primary-400 transition-colors duration-150"
               >
                 <Mail className="h-5 w-5" />
               </motion.a>
               <motion.a
                 href="#"
                 whileHover={{ scale: 1.1 }}
-                className="text-gray-400 hover:text-primary-400 transition-colors"
+                className="text-gray-400 hover:text-primary-400 transition-colors duration-150"
               >
                 <MapPin className="h-5 w-5" />
               </motion.a>
@@ -51,10 +51,10 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">빠른 링크</h3>
             <ul className="space-y-2">
-              <li><a href="/chatbot" className="text-gray-300 hover:text-primary-400 transition-colors">AI 의학상담</a></li>
-              <li><a href="/policy" className="text-gray-300 hover:text-primary-400 transition-colors">정책 추천</a></li>
-              <li><a href="/medical" className="text-gray-300 hover:text-primary-400 transition-colors">의료시설 찾기</a></li>
-              <li><a href="/postpartum" className="text-gray-300 hover:text-primary-400 transition-colors">산후조리원</a></li>
+              <li><a href="/chatbot" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">AI 의학상담</a></li>
+              <li><a href="/policy" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">정책 추천</a></li>
+              <li><a href="/medical" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">의료시설 찾기</a></li>
+              <li><a href="/postpartum" className="text-gray-300 hover:text-primary-400 transition-colors duration-150">산후조리원</a></li>
             </ul>
           </div>
 

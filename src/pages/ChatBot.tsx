@@ -224,8 +224,9 @@ const ChatBot = () => {
                   key={index}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'tween', duration: 0.15 }}
                   onClick={() => handleSuggestedQuestion(question)}
-                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors"
+                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors duration-150"
                 >
                   {question}
                 </motion.button>
@@ -247,8 +248,9 @@ const ChatBot = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                transition={{ type: 'tween', duration: 0.15 }}
                 onClick={handleSendMessage}
-                className="bg-primary-500 text-white p-3 rounded-full hover:bg-primary-600 transition-colors"
+                className="bg-primary-500 text-white p-3 rounded-full hover:bg-primary-600 transition-colors duration-150"
               >
                 <Send className="h-5 w-5" />
               </motion.button>

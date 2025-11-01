@@ -211,7 +211,8 @@ const MedicalFacilities = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors"
+                transition={{ type: 'tween', duration: 0.15 }}
+                className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors duration-150"
               >
                 <Navigation className="h-4 w-4" />
               </motion.button>
@@ -230,8 +231,9 @@ const MedicalFacilities = () => {
                       key={type.id}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
+                      transition={{ type: 'tween', duration: 0.15 }}
                       onClick={() => setSelectedType(type.id)}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-150 ${
                         selectedType === type.id
                           ? 'bg-primary-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -253,8 +255,9 @@ const MedicalFacilities = () => {
                     key={category}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    transition={{ type: 'tween', duration: 0.15 }}
                     onClick={() => setSelectedCategory(category === '전체' ? 'all' : category)}
-                    className={`px-4 py-2 rounded-lg transition-colors duration-200 ${
+                    className={`px-4 py-2 rounded-lg transition-colors duration-150 ${
                       (category === '전체' && selectedCategory === 'all') || selectedCategory === category
                         ? 'bg-primary-500 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -338,6 +341,7 @@ const MedicalFacilities = () => {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  transition={{ type: 'tween', duration: 0.15 }}
                   className="flex-1 btn-primary text-sm py-2"
                 >
                   <MapPin className="inline-block h-4 w-4 mr-1" />
@@ -346,7 +350,8 @@ const MedicalFacilities = () => {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-200"
+                  transition={{ type: 'tween', duration: 0.15 }}
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-150"
                 >
                   <Phone className="inline-block h-4 w-4 mr-1" />
                   전화하기

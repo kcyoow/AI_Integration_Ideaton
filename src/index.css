@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,36 +9,236 @@
     --foreground: 222.2 47.4% 11.2%;
     --border: 214.3 31.8% 91.4%;
   }
+  
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.6;
+    letter-spacing: -0.02em;
   }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold;
+    letter-spacing: -0.03em;
+  }
+  
+  h1 { @apply text-4xl md:text-5xl; }
+  h2 { @apply text-3xl md:text-4xl; }
+  h3 { @apply text-2xl md:text-3xl; }
+  h4 { @apply text-xl md:text-2xl; }
+  h5 { @apply text-lg md:text-xl; }
+  h6 { @apply text-base md:text-lg; }
 }
 
 @layer components {
+  /* 정부 사이트 스타일 버튼 */
   .btn-primary {
-    @apply bg-primary-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-600 transition-colors duration-200 shadow-lg hover:shadow-xl;
+    @apply bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-all duration-150 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
   }
-
+  
   .btn-secondary {
-    @apply bg-secondary-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-secondary-600 transition-colors duration-200 shadow-lg hover:shadow-xl;
+    @apply bg-government-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-government-700 transition-all duration-150 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-primary-600 text-primary-600 px-6 py-3 rounded-lg font-medium hover:bg-primary-600 hover:text-white transition-all duration-150;
+  }
+  
+  .btn-accent {
+    @apply bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 transition-all duration-150 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
   }
 
+  /* 정부 사이트 스타일 카드 */
   .card {
-    @apply bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300;
+    @apply bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-xl transition-all duration-150 hover:border-primary-300;
+  }
+  
+  .card-header {
+    @apply border-b border-gray-200 pb-4 mb-4;
+  }
+  
+  .card-title {
+    @apply text-xl font-bold text-government-900 mb-2;
+  }
+  
+  .card-description {
+    @apply text-gray-600 leading-relaxed;
   }
 
+  /* 정부 사이트 스타일 배경 */
   .gradient-bg {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 50%, #1d4ed8 100%);
+  }
+  
+  .gradient-bg-light {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+  }
+  
+  .gradient-bg-government {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
   }
 
+  /* 정부 사이트 스타일 텍스트 */
   .text-gradient {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+  
+  .text-government {
+    @apply text-government-900;
+  }
+  
+  .text-primary {
+    @apply text-primary-700;
+  }
+
+  /* 정부 사이트 스타일 섹션 */
+  .section {
+    @apply py-16 px-4;
+  }
+  
+  .section-header {
+    @apply text-center mb-12;
+  }
+  
+  .section-title {
+    @apply text-3xl md:text-4xl font-bold text-government-900 mb-4;
+  }
+  
+  .section-subtitle {
+    @apply text-xl text-gray-600 max-w-3xl mx-auto;
+  }
+
+  /* 정부 사이트 스타일 네비게이션 */
+  .nav-link {
+    @apply flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 hover:bg-primary-50 hover:text-primary-700;
+  }
+  
+  .nav-link-active {
+    @apply bg-primary-100 text-primary-700 font-semibold;
+  }
+
+  /* 정부 사이트 스타일 테이블 */
+  .table {
+    @apply w-full border-collapse bg-white rounded-lg overflow-hidden shadow-md;
+  }
+  
+  .table-header {
+    @apply bg-government-50 border-b-2 border-government-200;
+  }
+  
+  .table-row {
+    @apply border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150;
+  }
+  
+  .table-cell {
+    @apply px-6 py-4 text-sm;
+  }
+  
+  .table-header-cell {
+    @apply px-6 py-4 text-sm font-semibold text-government-700 text-left;
+  }
+
+  /* 정부 사이트 스타일 폼 */
+  .form-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-150;
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium text-government-700 mb-2;
+  }
+  
+  .form-select {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-150 bg-white;
+  }
+
+  /* 정부 사이트 스타일 배지 */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .badge-primary {
+    @apply bg-primary-100 text-primary-800;
+  }
+  
+  .badge-success {
+    @apply bg-success-100 text-success-800;
+  }
+  
+  .badge-accent {
+    @apply bg-accent-100 text-accent-800;
+  }
+  
+  .badge-government {
+    @apply bg-government-100 text-government-800;
+  }
+
+  /* 애니메이션 유틸리티 */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+  }
+  
+  .animate-slide-in-left {
+    animation: slideInLeft 0.5s ease-out;
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.5s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.4s ease-out;
+  }
+  
+  /* 커스텀 키프레임 */
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideInLeft {
+    0% {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes slideInRight {
+    0% {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes scaleIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 }
