@@ -1,0 +1,8 @@
+server/
+old/
+**/*.md
+**/*.ipynb
+**/*.log
+**/.DS_Store
+
+

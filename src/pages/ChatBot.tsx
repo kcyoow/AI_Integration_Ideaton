@@ -11,6 +11,7 @@ import {
   type StoredMessage,
   type ChatSessionMeta
 } from '../lib/chatLocal'
+import { streamChat, type ChatInMessage } from '../lib/chatApi'
 
 interface Message {
   id: string
@@ -190,45 +191,62 @@ const ChatBot = () => {
     setTypingSessionId(activeSessionId)
     touchSession(activeSessionId, text)
 
-    setTimeout(() => {
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: generateBotResponse(text),
-        sender: 'bot',
-        timestamp: new Date()
-      }
-      const storedMessages = loadSessionMessages(storageUserId, activeSessionId)
-      const nextStored = [...storedMessages, ...toStored([botMessage])]
-      saveSessionMessages(storageUserId, activeSessionId, nextStored)
-      touchSession(activeSessionId)
-      if (currentSessionRef.current === activeSessionId) {
-        setMessages(prev => [...prev, botMessage])
-        setIsTyping(false)
-        setTypingSessionId(null)
-      }
-    }, 1500)
-  }
+    const botMsgId = (Date.now() + 1).toString()
+    const botPlaceholder: Message = {
+      id: botMsgId,
+      text: '',
+      sender: 'bot',
+      timestamp: new Date()
+    }
+    setMessages(prev => {
+      const next = [...prev, botPlaceholder]
+      persistMessages(next, activeSessionId)
+      return next
+    })
 
-  const generateBotResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase()
-    
-    if (lowerMessage.includes('주의사항') || lowerMessage.includes('초기')) {
-      return '임신 초기 주의사항에 대해 알려드릴게요! 🤰\n\n**주요 주의사항:**\n• 규칙적인 산전 검진 받기\n• 금주 및 금연 strictly 지키기\n• 카페인 섭취 제한 (하루 200mg 이하)\n• 적절한 운동과 충분한 휴식\n• 엽산, 철분, 비타민D 보충\n\n**피해야 할 음식:**\n• 날생선이나 회\n• 덜 익힌 고기, 계란\n• 파스퇴르 처리되지 않은 유제품\n\n더 궁금한 점이 있으시면 언제든지 질문해주세요!'
-    }
-    
-    if (lowerMessage.includes('태교')) {
-      return '태교는 엄마와 아기의 정서적 유대를 형성하는 중요한 활동입니다! 🎵\n\n**추천 태교 활동:**\n• 음악 태교: 클래식, 자연의 소리\n• 대화 태교: 아기에게 매일 말 걸어주기\n• 독서 태교: 동화책, 시 읽어주기\n• 미술 태교: 그림 그리기, 미술관 방문\n• 산책 태교: 자연 속에서 산책하기\n\n**시기별 태교:**\n• 임신 초기: 안정적인 환경 조성\n• 임신 중기: 다양한 감각 자극\n• 임신 후기: 출산 준비 및 호흡법\n\n행복한 태교 되세요!'
-    }
-    
-    if (lowerMessage.includes('영양제')) {
-      return '임신 중 필수 영양제에 대해 안내해 드릴게요! 💊\n\n**필수 영양제:**\n• **엽산**: 신경관 결함 예방 (임신 3개월까지 필수)\n• **철분**: 빈혈 예방, 태아 성장 지원\n• **칼슘**: 뼈와 치아 형성\n• **비타민D**: 칼슘 흡수 도움\n• **오메가3**: 뇌 발달, 시력 발달\n\n**섭취 시 주의사항:**\n• 반드시 의사와 상담 후 복용\n• 권장량 준수하기\n• 정제된 영양제 선택\n\n안전한 임신을 위해서는 전문가와 상담이 가장 중요합니다!'
-    }
-    
-    if (lowerMessage.includes('출산 준비물')) {
-      return '출산 준비물 체크리스트를 알려드릴게요! 🏥\n\n**병원 준비물:**\n• 신분증, 건강보험증\n• 입원 필요 서류\n• 편한 임부복, 수유브라\n• 생리대, 속옷\n• 세면도구\n\n**아기 준비물:**\n• 실내복 5-6벌, 외출복 2-3벌\n• 속싸개, 받침대\n• 기저귀, 물티슈\n• 아기 용품 (젖병, 젖꼭지 등)\n\n**집에서 미리 준비:**\n• 아기 침대, 카시트\n• 의류, 수유용품\n• 목욕용품, 위생용품\n\n출산 2-3주 전부터 준비하시면 편안하세요!'
-    }
-    
-    return '좋은 질문입니다! 의학 전문가의 검토를 통해 정확한 정보를 제공해 드릴게요. 🏥\n\n**일반적인 조언:**\n• 정기적인 산전 검진이 매우 중요합니다\n• 몸의 변화에 주의를 기울이세요\n• 충분한 휴식과 영양 섭취가 필요합니다\n• 스트레스 관리가 필수적입니다\n\n더 구체적인 정보가 필요하시면 관련 키워드를 포함해서 다시 질문해 주세요. 예: "임신 초기 영양", "태교 방법" 등'
+    const priorStored = loadSessionMessages(storageUserId, activeSessionId)
+    const prior: Message[] = fromStored(priorStored)
+    const history: ChatInMessage[] = [...prior, userMessage].map(m => ({
+      role: m.sender === 'user' ? 'user' : 'assistant',
+      content: m.text
+    }))
+
+    ;(async () => {
+      let assembled = ''
+      try {
+        for await (const event of streamChat(history)) {
+          if (currentSessionRef.current !== activeSessionId) break
+          if (event.type === 'token') {
+            assembled += event.content
+          } else if (event.type === 'message') {
+            assembled += (assembled ? '\n\n' : '') + event.content
+          } else if (event.type === 'suggestions') {
+            const sug = event.suggestions.map(s => `• ${s}`).join('\n')
+            assembled += (assembled ? '\n\n' : '') + sug
+          } else {
+            // ignore: decision/start/end
+          }
+          setMessages(prev => {
+            const next = prev.map(m => m.id === botMsgId ? { ...m, text: assembled } : m)
+            persistMessages(next, activeSessionId)
+            return next
+          })
+        }
+      } catch (err) {
+        const fallback = '죄송합니다. 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+        assembled = assembled || fallback
+      } finally {
+        const storedMessages = loadSessionMessages(storageUserId, activeSessionId)
+        const finalBot: Message = { ...botPlaceholder, text: assembled }
+        const nextStored = [...storedMessages, ...toStored([finalBot])]
+        saveSessionMessages(storageUserId, activeSessionId, nextStored)
+        touchSession(activeSessionId)
+        if (currentSessionRef.current === activeSessionId) {
+          setIsTyping(false)
+          setTypingSessionId(null)
+        }
+      }
+    })()
   }
 
   const handleSendMessage = () => {
