@@ -13,7 +13,7 @@ import {
   type ChatSessionMeta
 } from '../lib/chatLocal'
 import { streamChat, type ChatInMessage } from '../lib/chatApi'
-import { detectPostnatalCareIntent, extractSigunFromAddress } from '../lib/intent'
+import { detectPostnatalCareIntent, detectMedicalFacilityIntent, extractSigunFromAddress } from '../lib/intent'
 import { fetchPostnatalCare, type PostnatalCareItem } from '../lib/ggApi'
 import { geocodeAddress, distanceKm, type Coordinates } from '../lib/geo'
 import { loadMedicalFacilities, type MedicalFacility } from '../lib/facilities'
@@ -452,9 +452,36 @@ const ChatBot = () => {
       persistMessages(next, activeSessionId)
       return next
     })
+    touchSession(activeSessionId, text)
+
+    // 원천 차단: 산후조리원/의료시설 위치 의도는 서버로 전송하지 않음
+    const isPostnatalIntent = detectPostnatalCareIntent(text)
+    const isMedicalIntent = detectMedicalFacilityIntent(text)
+    if (isPostnatalIntent || isMedicalIntent) {
+      suppressCurrentReplyRef.current = true
+      setIsTyping(false)
+      setTypingSessionId(null)
+      setBusyCount(prev => prev + 1)
+      pendingCardTasksRef.current += 1
+      ;(async () => {
+        try {
+          if (isPostnatalIntent) {
+            await triggerPostnatalRecommend(activeSessionId)
+          } else {
+            await triggerMedicalRecommend(activeSessionId)
+          }
+        } finally {
+          pendingCardTasksRef.current = Math.max(0, pendingCardTasksRef.current - 1)
+          setBusyCount(prev => Math.max(0, prev - 1))
+          suppressCurrentReplyRef.current = false
+          touchSession(activeSessionId)
+        }
+      })()
+      return
+    }
+
     setIsTyping(true)
     setTypingSessionId(activeSessionId)
-    touchSession(activeSessionId, text)
 
     let botMsgId: string | null = null
 

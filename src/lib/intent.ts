@@ -7,6 +7,13 @@ export function detectPostnatalCareIntent(query: string): boolean {
   return topic && near
 }
 
+export function detectMedicalFacilityIntent(query: string): boolean {
+  const text = String(query || '').toLowerCase()
+  const topic = /(의료시설|병원|산부인과|약국|보건소)/i.test(text)
+  const near = /(근처|주변|가까운|위치|어디|추천)/i.test(text)
+  return topic && near
+}
+
 // 매우 단순한 규칙 기반 시군 추출 (필요시 확장)
 export function extractSigunFromAddress(address: string | null | undefined): string | null {
   const src = String(address || '')
