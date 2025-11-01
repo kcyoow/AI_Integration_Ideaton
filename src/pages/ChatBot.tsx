@@ -213,16 +213,10 @@ const ChatBot = () => {
     ;(async () => {
       let assembled = ''
       try {
-        let started = false
+        let contentStarted = false
         for await (const event of streamChat(history)) {
           if (currentSessionRef.current !== activeSessionId) break
-          if (!started) {
-            started = true
-            if (currentSessionRef.current === activeSessionId) {
-              setIsTyping(false)
-              setTypingSessionId(null)
-            }
-          }
+
           if (event.type === 'token') {
             assembled += event.content
           } else if (event.type === 'message') {
@@ -233,6 +227,15 @@ const ChatBot = () => {
           } else {
             // ignore: decision/start/end
           }
+
+          if (!contentStarted && assembled.trim() !== '') {
+            contentStarted = true
+            if (currentSessionRef.current === activeSessionId) {
+              setIsTyping(false)
+              setTypingSessionId(null)
+            }
+          }
+
           setMessages(prev => {
             const next = prev.map(m => m.id === botMsgId ? { ...m, text: assembled } : m)
             persistMessages(next, activeSessionId)
