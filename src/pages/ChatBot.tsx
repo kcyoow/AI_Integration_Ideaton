@@ -150,6 +150,8 @@ const ChatBot = () => {
         payload: { cta: 'login' }
       }
       setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last && last.kind === 'ctaLogin') return prev
         const next = [...prev, loginMsg]
         persistMessages(next, activeSessionId)
         return next
@@ -229,6 +231,20 @@ const ChatBot = () => {
       return next
     })
     recentCardsRef.current = 'postnatal'
+
+    // 형식적 사후 안내 버블 추가 (모델 답변을 차단했으므로 수동으로 제공)
+    const formalMsg: Message = {
+      id: (Date.now() + 13).toString(),
+      text: '위 추천 결과를 참고하시고, 최신 정보 및 예약은 각 기관 또는 보건소/병원 홈페이지에서 확인해 주세요. 더 자세한 정보는 의사와 상담하세요.',
+      sender: 'bot',
+      timestamp: new Date(),
+      kind: 'text'
+    }
+    setMessages(prev => {
+      const next = [...prev, formalMsg]
+      persistMessages(next, activeSessionId)
+      return next
+    })
     } finally {
       postnatalInFlightRef.current = false
     }
@@ -250,6 +266,8 @@ const ChatBot = () => {
         payload: { cta: 'login' }
       }
       setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last && last.kind === 'ctaLogin') return prev
         const next = [...prev, loginMsg]
         persistMessages(next, activeSessionId)
         return next
@@ -313,6 +331,19 @@ const ChatBot = () => {
       return next
     })
     recentCardsRef.current = 'medical'
+
+    const formalMsg: Message = {
+      id: (Date.now() + 23).toString(),
+      text: '위 추천 결과를 참고하시고, 최신 정보 및 진료 가능 여부는 해당 의료기관 또는 보건소/병원 홈페이지에서 확인해 주세요. 더 자세한 정보는 의사와 상담하세요.',
+      sender: 'bot',
+      timestamp: new Date(),
+      kind: 'text'
+    }
+    setMessages(prev => {
+      const next = [...prev, formalMsg]
+      persistMessages(next, activeSessionId)
+      return next
+    })
     } finally {
       medicalInFlightRef.current = false
     }
@@ -435,15 +466,17 @@ const ChatBot = () => {
           } else if (event.type === 'message') {
             if (!modelStarted) {
               // 모델 시작 전 서버가 보낸 안내 메시지는 즉시 별도 버블로 노출
-              if (!suppressCurrentReplyRef.current) {
+              const t = String(event.content || '')
+              // 비로그인 + 위치안내 문구는 표시하지 않음(CTA만 노출)
+              const isLocationInfo = /(산후\s*조리원|조리원|의료시설|의료|병원|약국|보건소)/.test(t)
+              if (!suppressCurrentReplyRef.current && !(isLocationInfo && !auth.userId)) {
                 const infoMsg: Message = {
                   id: (Date.now() + Math.random()).toString(),
-                  text: event.content,
+                  text: t,
                   sender: 'bot',
                   timestamp: new Date()
                 }
                 try {
-                  const t = String(event.content || '')
                   if (/(산후\s*조리원|조리원)/.test(t)) infoShownRef.current.postnatal = true
                   if (/(의료시설|의료|병원|약국|보건소)/.test(t)) infoShownRef.current.medical = true
                 } catch {}
@@ -466,6 +499,8 @@ const ChatBot = () => {
           } else if ((event as any).type === 'action') {
             const action = event as any
             if (action.name === 'postnatal.recommend') {
+              // 의도 감지 시 이번 턴의 모델 답변은 차단하고 형식적 답변만
+              suppressCurrentReplyRef.current = true
               disableLocalPostnatalRef.current = true
               ;(async () => {
                 // 안내 버블이 아직 없다면 먼저 추가하여 순서 보장
@@ -493,6 +528,7 @@ const ChatBot = () => {
                 }
               })()
             } else if (action.name === 'medical.recommend') {
+              suppressCurrentReplyRef.current = true
               ;(async () => {
                 if (!infoShownRef.current.medical) {
                   const infoMsg: Message = {
@@ -593,6 +629,8 @@ const ChatBot = () => {
       try {
         // 서버 action을 잠시 기다렸다가(예: 800ms) 오지 않으면 백업 로직 수행
         await new Promise(resolve => setTimeout(resolve, 800))
+        // 이번 턴 모델 답변 차단(형식 답변만)
+        suppressCurrentReplyRef.current = true
         if (disableLocalPostnatalRef.current) return
         if (!detectPostnatalCareIntent(text)) return
         if (currentSessionRef.current !== activeSessionId) return
