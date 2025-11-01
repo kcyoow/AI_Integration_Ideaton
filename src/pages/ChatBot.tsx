@@ -65,6 +65,7 @@ const ChatBot = () => {
   const pendingCardTasksRef = useRef<number>(0)
   const infoShownRef = useRef<{ postnatal: boolean; medical: boolean }>({ postnatal: false, medical: false })
   const recentCardsRef = useRef<'postnatal' | 'medical' | null>(null)
+  const suppressCurrentReplyRef = useRef<boolean>(false)
 
   const isChatBlocked = busyCount > 0
 
@@ -139,6 +140,7 @@ const ChatBot = () => {
     try {
     // 미로그인: 로그인 유도 버블
     if (!auth.userId) {
+      suppressCurrentReplyRef.current = true
       const loginMsg: Message = {
         id: (Date.now() + 2).toString(),
         text: '산후조리원 정보는 로그인 후 이용하실 수 있습니다.',
@@ -238,6 +240,7 @@ const ChatBot = () => {
     medicalInFlightRef.current = true
     try {
     if (!auth.userId) {
+      suppressCurrentReplyRef.current = true
       const loginMsg: Message = {
         id: (Date.now() + 2).toString(),
         text: '의료시설 정보는 로그인 후 이용하실 수 있습니다.',
@@ -426,32 +429,40 @@ const ChatBot = () => {
           if (event.type === 'start') {
             modelStarted = true
           } else if (event.type === 'token') {
-            assembled += event.content
+            if (!suppressCurrentReplyRef.current) {
+              assembled += event.content
+            }
           } else if (event.type === 'message') {
             if (!modelStarted) {
               // 모델 시작 전 서버가 보낸 안내 메시지는 즉시 별도 버블로 노출
-              const infoMsg: Message = {
-                id: (Date.now() + Math.random()).toString(),
-                text: event.content,
-                sender: 'bot',
-                timestamp: new Date()
+              if (!suppressCurrentReplyRef.current) {
+                const infoMsg: Message = {
+                  id: (Date.now() + Math.random()).toString(),
+                  text: event.content,
+                  sender: 'bot',
+                  timestamp: new Date()
+                }
+                try {
+                  const t = String(event.content || '')
+                  if (/(산후\s*조리원|조리원)/.test(t)) infoShownRef.current.postnatal = true
+                  if (/(의료시설|의료|병원|약국|보건소)/.test(t)) infoShownRef.current.medical = true
+                } catch {}
+                setMessages(prev => {
+                  const next = [...prev, infoMsg]
+                  persistMessages(next, activeSessionId)
+                  return next
+                })
               }
-              try {
-                const t = String(event.content || '')
-                if (/(산후\s*조리원|조리원)/.test(t)) infoShownRef.current.postnatal = true
-                if (/(의료시설|의료|병원|약국|보건소)/.test(t)) infoShownRef.current.medical = true
-              } catch {}
-              setMessages(prev => {
-                const next = [...prev, infoMsg]
-                persistMessages(next, activeSessionId)
-                return next
-              })
             } else {
-              assembled += (assembled ? '\n\n' : '') + event.content
+              if (!suppressCurrentReplyRef.current) {
+                assembled += (assembled ? '\n\n' : '') + event.content
+              }
             }
           } else if (event.type === 'suggestions') {
-            const sug = event.suggestions.map(s => `• ${s}`).join('\n')
-            assembled += (assembled ? '\n\n' : '') + sug
+            if (!suppressCurrentReplyRef.current) {
+              const sug = event.suggestions.map(s => `• ${s}`).join('\n')
+              assembled += (assembled ? '\n\n' : '') + sug
+            }
           } else if ((event as any).type === 'action') {
             const action = event as any
             if (action.name === 'postnatal.recommend') {
@@ -511,7 +522,7 @@ const ChatBot = () => {
             // ignore: decision/start/end
           }
 
-          if (!contentStarted && assembled.trim() !== '' && pendingCardTasksRef.current === 0) {
+          if (!contentStarted && !suppressCurrentReplyRef.current && assembled.trim() !== '' && pendingCardTasksRef.current === 0) {
             contentStarted = true
             if (currentSessionRef.current === activeSessionId) {
               setIsTyping(false)
@@ -540,7 +551,7 @@ const ChatBot = () => {
       } finally {
         setBusyCount(prev => Math.max(0, prev - 1))
         // 카드가 아직 준비되지 않았다면 최대 2초까지 대기 후 메시지를 생성
-        if (!botMsgId) {
+        if (!botMsgId && !suppressCurrentReplyRef.current) {
           const start = Date.now()
           const waitLoop = async () => {
             while (pendingCardTasksRef.current > 0 && Date.now() - start < 2000) {
@@ -559,7 +570,7 @@ const ChatBot = () => {
               return next
             })
           }
-        } else {
+        } else if (!suppressCurrentReplyRef.current) {
           const finalText = tailorPostResultText(assembled)
           setMessages(prev => {
             const next = prev.map(m => m.id === botMsgId ? { ...m, text: finalText } : m)
@@ -567,6 +578,8 @@ const ChatBot = () => {
             return next
           })
         }
+        // 스트림 종료 후 억제 플래그 해제
+        suppressCurrentReplyRef.current = false
         touchSession(activeSessionId)
         if (currentSessionRef.current === activeSessionId) {
           setIsTyping(false)
