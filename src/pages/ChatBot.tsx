@@ -200,7 +200,6 @@ const ChatBot = () => {
     }
     setMessages(prev => {
       const next = [...prev, botPlaceholder]
-      persistMessages(next, activeSessionId)
       return next
     })
 
@@ -236,10 +235,11 @@ const ChatBot = () => {
         const fallback = '죄송합니다. 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
         assembled = assembled || fallback
       } finally {
-        const storedMessages = loadSessionMessages(storageUserId, activeSessionId)
-        const finalBot: Message = { ...botPlaceholder, text: assembled }
-        const nextStored = [...storedMessages, ...toStored([finalBot])]
-        saveSessionMessages(storageUserId, activeSessionId, nextStored)
+        setMessages(prev => {
+          const next = prev.map(m => m.id === botMsgId ? { ...m, text: assembled } : m)
+          persistMessages(next, activeSessionId)
+          return next
+        })
         touchSession(activeSessionId)
         if (currentSessionRef.current === activeSessionId) {
           setIsTyping(false)
@@ -348,7 +348,7 @@ const ChatBot = () => {
             ref={messagesContainerRef}
             className={`${messagesContainerHeightClass} overflow-y-auto p-6 space-y-4`}
           >
-            {messages.map((message) => (
+            {messages.filter(m => m.text.trim() !== '').map((message) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 10 }}
