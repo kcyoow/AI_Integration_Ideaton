@@ -383,7 +383,7 @@ const ChatBot = () => {
           {/* Chat Messages */}
           <div
             ref={messagesContainerRef}
-            className={`${messagesContainerHeightClass} overflow-y-auto p-6 space-y-4`}
+            className={`${messagesContainerHeightClass} overflow-y-auto px-6 pb-6 pt-0 space-y-4`}
           >
             {messages.filter(m => m.text.trim() !== '').map((message) => (
               <motion.div
