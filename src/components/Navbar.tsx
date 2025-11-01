@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Baby, 
@@ -11,11 +11,14 @@ import {
   X,
   Stethoscope
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { auth, logout } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -94,19 +97,35 @@ const Navbar = () => {
 
             {/* 우측 액션 버튼 */}
             <div className="hidden lg:flex items-center space-x-3">
+              {auth.userId ? (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    logout()
+                    window.location.href = '/'
+                  }}
+                  className="btn-outline text-sm"
+                >
+                  로그아웃
+                </motion.button>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/login')}
+                  className="btn-outline text-sm"
+                >
+                  로그인
+                </motion.button>
+              )}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="btn-outline text-sm"
-              >
-                로그인
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate(auth.userId ? '/chatbot' : '/signup')}
                 className="btn-primary text-sm"
               >
-                서비스 시작하기
+                {auth.userId ? '챗봇으로 이동' : '서비스 시작하기'}
               </motion.button>
             </div>
 
@@ -200,11 +219,36 @@ const Navbar = () => {
                   transition={{ delay: 0.6 }}
                   className="pt-4 border-t border-gray-200 space-y-3"
                 >
-                  <button className="w-full btn-outline text-sm">
-                    로그인
-                  </button>
-                  <button className="w-full btn-primary text-sm">
-                    서비스 시작하기
+                  {auth.userId ? (
+                    <button
+                      className="w-full btn-outline text-sm"
+                      onClick={() => {
+                        logout()
+                        setIsOpen(false)
+                        window.location.href = '/'
+                      }}
+                    >
+                      로그아웃
+                    </button>
+                  ) : (
+                    <button
+                      className="w-full btn-outline text-sm"
+                      onClick={() => {
+                        navigate('/login')
+                        setIsOpen(false)
+                      }}
+                    >
+                      로그인
+                    </button>
+                  )}
+                  <button
+                    className="w-full btn-primary text-sm"
+                    onClick={() => {
+                      navigate(auth.userId ? '/chatbot' : '/signup')
+                      setIsOpen(false)
+                    }}
+                  >
+                    {auth.userId ? '챗봇으로 이동' : '서비스 시작하기'}
                   </button>
                 </motion.div>
               </div>

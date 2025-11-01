@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Search, 
@@ -13,6 +13,7 @@ import {
   Heart,
   
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 interface Facility {
   id: string
@@ -30,10 +31,17 @@ interface Facility {
 }
 
 const MedicalFacilities = () => {
+  const { auth } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [userLocation, setUserLocation] = useState('안산시 상록구')
+
+  useEffect(() => {
+    if (auth.address) {
+      setUserLocation(prev => (prev === '' || prev === '안산시 상록구') ? auth.address : prev)
+    }
+  }, [auth.address])
 
   const facilities: Facility[] = [
     {

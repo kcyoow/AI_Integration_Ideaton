@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Send, Bot, User, Clock, Info } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { loadChat, saveChat, type StoredMessage } from '../lib/chatLocal'
 
 interface Message {
   id: string
@@ -10,18 +12,32 @@ interface Message {
 }
 
 const ChatBot = () => {
-  const [messages, setMessages] = useState<Message[]>([
+  const { auth } = useAuth()
+  const defaultMessages = useCallback((): Message[] => ([
     {
-      id: '1',
+      id: 'welcome',
       text: '안녕하세요! 안산맘케어 AI 챗봇 상담입니다. 임신과 출산에 관한 모든 질문에 답변해 드립니다. 무엇이 궁금하신가요?',
       sender: 'bot',
       timestamp: new Date()
     }
-  ])
+  ]), [])
+
+  const [messages, setMessages] = useState<Message[]>(() => defaultMessages())
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [isInfoTooltipVisible, setIsInfoTooltipVisible] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+
+  const persistMessages = useCallback((nextMessages: Message[]) => {
+    if (!auth.userId) return
+    const stored: StoredMessage[] = nextMessages.map(message => ({
+      id: message.id,
+      text: message.text,
+      sender: message.sender,
+      timestamp: message.timestamp.toISOString()
+    }))
+    saveChat(auth.userId, stored)
+  }, [auth.userId])
 
   const scrollToBottom = () => {
     if (!messagesContainerRef.current) return
@@ -34,6 +50,21 @@ const ChatBot = () => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    if (auth.userId) {
+      const stored = loadChat(auth.userId)
+      if (stored.length > 0) {
+        setMessages(stored.map(item => ({
+          ...item,
+          timestamp: new Date(item.timestamp)
+        })))
+        return
+      }
+    }
+
+    setMessages(defaultMessages())
+  }, [auth.userId, defaultMessages])
 
   const suggestedQuestions = [
     '임신 초기 주의사항이 궁금해요',
@@ -54,7 +85,11 @@ const ChatBot = () => {
       timestamp: new Date()
     }
 
-    setMessages(prev => [...prev, userMessage])
+    setMessages(prev => {
+      const next = [...prev, userMessage]
+      persistMessages(next)
+      return next
+    })
     setIsTyping(true)
 
     setTimeout(() => {
@@ -64,7 +99,11 @@ const ChatBot = () => {
         sender: 'bot',
         timestamp: new Date()
       }
-      setMessages(prev => [...prev, botMessage])
+      setMessages(prev => {
+        const next = [...prev, botMessage]
+        persistMessages(next)
+        return next
+      })
       setIsTyping(false)
     }, 1500)
   }

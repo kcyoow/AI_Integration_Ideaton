@@ -9,6 +9,9 @@ import PolicyRecommendation from './pages/PolicyRecommendation'
 import MedicalFacilities from './pages/MedicalFacilities'
 import PostpartumCare from './pages/PostpartumCare'
 import Community from './pages/Community'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
+import { AuthProvider } from './context/AuthContext'
 
 // ScrollToTop 컴포넌트
 const ScrollToTop = () => {
@@ -53,97 +56,125 @@ const pageStyle = {
 
 function App() {
   return (
-    <Router>
-      <ScrollToTop />
-      <div className="min-h-screen bg-gradient-bg-government flex flex-col">
-        <Navbar />
-        <main className="flex-grow relative">
-          <AnimatePresence mode="wait">
-            <Routes>
-              <Route path="/" element={
-                <motion.div
-                  key="home"
-                  initial="initial"
-                  animate="in"
-                  exit="out"
-                  variants={pageVariants}
-                  transition={pageTransition}
-                  style={pageStyle}
-                >
-                  <Home />
-                </motion.div>
-              } />
-              <Route path="/chatbot" element={
-                <motion.div
-                  key="chatbot"
-                  initial="initial"
-                  animate="in"
-                  exit="out"
-                  variants={pageVariants}
-                  transition={pageTransition}
-                  style={pageStyle}
-                >
-                  <ChatBot />
-                </motion.div>
-              } />
-              <Route path="/policy" element={
-                <motion.div
-                  key="policy"
-                  initial="initial"
-                  animate="in"
-                  exit="out"
-                  variants={pageVariants}
-                  transition={pageTransition}
-                  style={pageStyle}
-                >
-                  <PolicyRecommendation />
-                </motion.div>
-              } />
-              <Route path="/medical" element={
-                <motion.div
-                  key="medical"
-                  initial="initial"
-                  animate="in"
-                  exit="out"
-                  variants={pageVariants}
-                  transition={pageTransition}
-                  style={pageStyle}
-                >
-                  <MedicalFacilities />
-                </motion.div>
-              } />
-              <Route path="/postpartum" element={
-                <motion.div
-                  key="postpartum"
-                  initial="initial"
-                  animate="in"
-                  exit="out"
-                  variants={pageVariants}
-                  transition={pageTransition}
-                  style={pageStyle}
-                >
-                  <PostpartumCare />
-                </motion.div>
-              } />
-              <Route path="/community" element={
-                <motion.div
-                  key="community"
-                  initial="initial"
-                  animate="in"
-                  exit="out"
-                  variants={pageVariants}
-                  transition={pageTransition}
-                  style={pageStyle}
-                >
-                  <Community />
-                </motion.div>
-              } />
-            </Routes>
-          </AnimatePresence>
-        </main>
-        <Footer />
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <ScrollToTop />
+        <div className="min-h-screen bg-gradient-bg-government flex flex-col">
+          <Navbar />
+          <main className="flex-grow relative">
+            <AnimatePresence mode="wait">
+              <Routes>
+                <Route path="/" element={
+                  <motion.div
+                    key="home"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <Home />
+                  </motion.div>
+                } />
+                <Route path="/chatbot" element={
+                  <motion.div
+                    key="chatbot"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <ChatBot />
+                  </motion.div>
+                } />
+                <Route path="/policy" element={
+                  <motion.div
+                    key="policy"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <PolicyRecommendation />
+                  </motion.div>
+                } />
+                <Route path="/medical" element={
+                  <motion.div
+                    key="medical"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <MedicalFacilities />
+                  </motion.div>
+                } />
+                <Route path="/postpartum" element={
+                  <motion.div
+                    key="postpartum"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <PostpartumCare />
+                  </motion.div>
+                } />
+                <Route path="/community" element={
+                  <motion.div
+                    key="community"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <Community />
+                  </motion.div>
+                } />
+                <Route path="/login" element={
+                  <motion.div
+                    key="login"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <Login />
+                  </motion.div>
+                } />
+                <Route path="/signup" element={
+                  <motion.div
+                    key="signup"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    style={pageStyle}
+                  >
+                    <Signup />
+                  </motion.div>
+                } />
+              </Routes>
+            </AnimatePresence>
+          </main>
+          <Footer />
+        </div>
+      </Router>
+    </AuthProvider>
   )
 }
 

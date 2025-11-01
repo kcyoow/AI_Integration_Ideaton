@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Search, 
@@ -19,6 +19,7 @@ import {
   Award,
   Navigation
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 interface PostpartumCenter {
   id: string
@@ -48,11 +49,19 @@ interface PostpartumCenter {
 }
 
 const PostpartumCare = () => {
+  const { auth } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState('all')
   const [priceRange, setPriceRange] = useState('all')
   const [duration, setDuration] = useState('all')
   const [sortBy, setSortBy] = useState('rating')
+  const [userAddress, setUserAddress] = useState('안산시 상록구')
+
+  useEffect(() => {
+    if (auth.address) {
+      setUserAddress(prev => (prev === '' || prev === '안산시 상록구') ? auth.address : prev)
+    }
+  }, [auth.address])
 
   const centers: PostpartumCenter[] = [
     {
@@ -271,6 +280,21 @@ const PostpartumCare = () => {
                 placeholder="산후조리원 이름을 검색하세요..."
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">기본 위치</label>
+            <div className="flex items-center space-x-2">
+              <MapPin className="h-5 w-5 text-primary-500" />
+              <input
+                type="text"
+                value={userAddress}
+                onChange={(event) => setUserAddress(event.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="주소를 입력하세요"
+              />
+              <span className="text-xs text-gray-500">로그인 시 자동 입력</span>
             </div>
           </div>
 
