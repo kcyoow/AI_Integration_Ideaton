@@ -3,6 +3,9 @@ export type StoredMessage = {
   text: string
   sender: 'user' | 'bot'
   timestamp: string
+  // 확장 필드: 메시지 유형 및 구조화 페이로드(옵션)
+  kind?: string
+  payload?: any
 }
 
 export type ChatSessionMeta = {

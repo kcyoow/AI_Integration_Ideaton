@@ -13,10 +13,12 @@ import {
   Navigation
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useSearchParams } from 'react-router-dom'
 import { fetchPostnatalCare, type PostnatalCareItem } from '../lib/ggApi'
 
 const PostpartumCare = () => {
   const { auth } = useAuth()
+  const [searchParams] = useSearchParams()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState('all')
@@ -28,12 +30,16 @@ const PostpartumCare = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const qpSigun = searchParams.get('sigun')
+    if (qpSigun) {
+      setSigun(qpSigun)
+      return
+    }
     if (auth.address) {
-      // 주소에 도시명이 포함되어 있으면 시군 값을 추출(간단 추정)
       const addr = String(auth.address)
       if (addr.includes('안산')) setSigun('안산시')
     }
-  }, [auth.address])
+  }, [auth.address, searchParams])
 
   useEffect(() => {
     const abort = new AbortController()

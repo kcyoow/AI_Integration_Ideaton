@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Send, Bot, User, Info, PlusCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   createSession,
@@ -12,12 +13,22 @@ import {
   type ChatSessionMeta
 } from '../lib/chatLocal'
 import { streamChat, type ChatInMessage } from '../lib/chatApi'
+import { detectPostnatalCareIntent, extractSigunFromAddress } from '../lib/intent'
+import { fetchPostnatalCare, type PostnatalCareItem } from '../lib/ggApi'
+import { geocodeAddress, distanceKm, type Coordinates } from '../lib/geo'
+
+type PostnatalBlockPayload = {
+  sigun: string
+  items: Array<PostnatalCareItem & { distanceKm?: number | null }>
+}
 
 interface Message {
   id: string
   text: string
   sender: 'user' | 'bot'
   timestamp: Date
+  kind?: 'text' | 'postnatalCards' | 'ctaLogin'
+  payload?: PostnatalBlockPayload | { cta: 'login' }
 }
 
 const ChatBot = () => {
@@ -51,14 +62,20 @@ const ChatBot = () => {
       id: message.id,
       text: message.text,
       sender: message.sender,
-      timestamp: message.timestamp.toISOString()
+      timestamp: message.timestamp.toISOString(),
+      kind: message.kind,
+      payload: message.payload as any
     }))
   ), [])
 
   const fromStored = useCallback((stored: StoredMessage[]): Message[] => (
     stored.map(item => ({
-      ...item,
-      timestamp: new Date(item.timestamp)
+      id: item.id,
+      text: item.text,
+      sender: item.sender,
+      timestamp: new Date(item.timestamp),
+      kind: (item as any).kind ?? 'text',
+      payload: (item as any).payload
     }))
   ), [])
 
@@ -258,6 +275,105 @@ const ChatBot = () => {
         }
       }
     })()
+
+    // 산후조리원 의도 감지 및 게이트 처리 (병렬)
+    ;(async () => {
+      try {
+        if (!detectPostnatalCareIntent(text)) return
+        if (currentSessionRef.current !== activeSessionId) return
+
+        // 미로그인: 로그인 유도 버블
+        if (!auth.userId) {
+          const loginMsg: Message = {
+            id: (Date.now() + 2).toString(),
+            text: '산후조리원 정보는 로그인 후 이용하실 수 있습니다.',
+            sender: 'bot',
+            timestamp: new Date(),
+            kind: 'ctaLogin',
+            payload: { cta: 'login' }
+          }
+          setMessages(prev => {
+            const next = [...prev, loginMsg]
+            persistMessages(next, activeSessionId)
+            return next
+          })
+          return
+        }
+
+        // 로그인: 주소 기반 조회
+        const fallbackSigun = (import.meta as any).env?.VITE_DEFAULT_SIGUN || '안산시'
+        const sigun = extractSigunFromAddress(auth.address) || fallbackSigun
+        const userLoc: Coordinates | null = await geocodeAddress(auth.address || '')
+
+        let ranked: Array<PostnatalCareItem & { distanceKm?: number | null }> = []
+        try {
+          const res = await fetchPostnatalCare({ sigun, size: 50 })
+          const list = Array.isArray(res.items) ? res.items : []
+          if (userLoc) {
+            ranked = list
+              .map(it => {
+                const d = it.coordinates ? distanceKm(userLoc, it.coordinates) : null
+                return { ...it, distanceKm: d }
+              })
+              .sort((a, b) => {
+                const da = a.distanceKm ?? Number.POSITIVE_INFINITY
+                const db = b.distanceKm ?? Number.POSITIVE_INFINITY
+                return da - db
+              })
+          } else {
+            ranked = list
+          }
+        } catch (e) {
+          // 데이터 실패 시 안내 버블
+          const errMsg: Message = {
+            id: (Date.now() + 3).toString(),
+            text: '죄송합니다. 산후조리원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+            sender: 'bot',
+            timestamp: new Date(),
+            kind: 'text'
+          }
+          setMessages(prev => {
+            const next = [...prev, errMsg]
+            persistMessages(next, activeSessionId)
+            return next
+          })
+          return
+        }
+
+        const topN = ranked.slice(0, 5)
+
+        // 주소 부재 시 안내 버블 추가 (기본 시군 기준 표시)
+        if (!auth.address) {
+          const infoMsg: Message = {
+            id: (Date.now() + 3.5).toString(),
+            text: `등록된 주소가 없어 기본 위치(${sigun}) 기준으로 추천합니다. 회원정보에서 주소를 추가하시면 거리순 추천을 받을 수 있어요.`,
+            sender: 'bot',
+            timestamp: new Date(),
+            kind: 'text'
+          }
+          setMessages(prev => {
+            const next = [...prev, infoMsg]
+            persistMessages(next, activeSessionId)
+            return next
+          })
+        }
+        const blockMsg: Message = {
+          id: (Date.now() + 4).toString(),
+          text: '',
+          sender: 'bot',
+          timestamp: new Date(),
+          kind: 'postnatalCards',
+          payload: { sigun, items: topN }
+        }
+        setMessages(prev => {
+          const next = [...prev, blockMsg]
+          persistMessages(next, activeSessionId)
+          return next
+        })
+      } catch {
+        // 조용히 무시 (의도 감지/지오코딩 등 비핵심 실패)
+      }
+    })()
   }
 
   const handleSendMessage = () => {
@@ -284,6 +400,17 @@ const ChatBot = () => {
       minute: '2-digit',
       hour12: false
     })
+  }
+
+  const openMapFor = (item: PostnatalCareItem) => {
+    if (item.coordinates) {
+      const { lat, lng } = item.coordinates
+      const href = `https://map.naver.com/v5/?c=${lng},${lat},16,0,0,0,dh`
+      window.open(href, '_blank', 'noopener')
+    } else {
+      const query = encodeURIComponent(`${item.name} ${item.address}`)
+      window.open(`https://map.naver.com/p/search/${query}`, '_blank', 'noopener')
+    }
   }
 
   // 간단한 마크다운(**굵게**)과 줄바꿈 렌더링
@@ -385,7 +512,7 @@ const ChatBot = () => {
             ref={messagesContainerRef}
             className={`${messagesContainerHeightClass} overflow-y-auto px-6 pb-6 pt-0 space-y-4`}
           >
-            {messages.filter(m => m.text.trim() !== '').map((message) => (
+            {messages.filter(m => (m.kind && m.kind !== 'text') || m.text.trim() !== '').map((message) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -409,13 +536,81 @@ const ChatBot = () => {
                       message.sender === 'user' ? 'flex-row-reverse' : ''
                     }`}
                   >
-                    <div className={`p-4 rounded-2xl ${
-                      message.sender === 'user'
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      <p className="text-sm">{renderTextWithBasicMarkdown(message.text)}</p>
-                    </div>
+                    {message.kind === 'postnatalCards' && message.payload && (
+                      <div className="bg-gray-100 text-gray-800 p-4 rounded-2xl w-full">
+                        {(() => {
+                          const payload: any = message.payload
+                          const items: any[] = Array.isArray(payload.items) ? payload.items : []
+                          const hasDistance = items.some((it) => typeof it?.distanceKm === 'number')
+                          return (
+                            <div className="mb-3">
+                              <p className="text-sm font-semibold text-gray-800">근처 산후조리원 추천 ({payload.sigun})</p>
+                              {hasDistance ? (
+                                <p className="text-xs text-gray-500">회원 주소 좌표 기준으로 거리 순 추천입니다.</p>
+                              ) : (
+                                <p className="text-xs text-gray-500">주소 좌표 확인이 어려워 거리 순 정렬 없이 보여드립니다.</p>
+                              )}
+                            </div>
+                          )
+                        })()}
+                        <div className="grid grid-cols-1 gap-3">
+                          {((message.payload as any).items || []).map((it: any, idx: number) => (
+                            <div key={`${it.id}-${idx}`} className="rounded-lg border border-gray-200 bg-white p-3">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-gray-900">{it.name}</span>
+                                    {typeof it.distanceKm === 'number' && (
+                                      <span className="text-[11px] text-gray-500">{it.distanceKm}km</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-gray-600 mt-1">{it.address}</div>
+                                  <div className="text-xs text-gray-500 mt-0.5">{it.phone || '-'}</div>
+                                </div>
+                                <div>
+                                  <button
+                                    onClick={() => openMapFor(it)}
+                                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded"
+                                  >
+                                    지도 보기
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 text-right">
+                          <Link
+                            to={`/postpartum?sigun=${encodeURIComponent((message.payload as any).sigun || '')}`}
+                            className="text-xs text-primary-600 hover:text-primary-700"
+                          >
+                            전체 보기
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
+                    {message.kind === 'ctaLogin' && (
+                      <div className="bg-gray-100 text-gray-800 p-4 rounded-2xl">
+                        <p className="text-sm mb-2">{renderTextWithBasicMarkdown(message.text)}</p>
+                        <Link
+                          to="/login"
+                          className="inline-block px-3 py-1 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded"
+                        >
+                          로그인 하러 가기
+                        </Link>
+                      </div>
+                    )}
+
+                    {(!message.kind || message.kind === 'text') && (
+                      <div className={`p-4 rounded-2xl ${
+                        message.sender === 'user'
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        <p className="text-sm">{renderTextWithBasicMarkdown(message.text)}</p>
+                      </div>
+                    )}
                     <div
                       className={`text-xs ${
                         message.sender === 'user'
