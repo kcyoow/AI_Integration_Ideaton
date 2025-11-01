@@ -27,7 +27,7 @@ interface Message {
   text: string
   sender: 'user' | 'bot'
   timestamp: Date
-  kind?: 'text' | 'postnatalCards' | 'ctaLogin'
+  kind?: 'text' | 'postnatalCards' | 'ctaLogin' | 'postnatalLoading'
   payload?: PostnatalBlockPayload | { cta: 'login' }
 }
 
@@ -300,7 +300,23 @@ const ChatBot = () => {
           return
         }
 
-        // 로그인: 주소 기반 조회
+        // 로그인: 주소 기반 조회 (로딩 버블 먼저 표시)
+        const loadingId = (Date.now() + 12).toString()
+        const loadingMsg: Message = {
+          id: loadingId,
+          text: '산후조리원 정보를 불러오는 중...'
+            + '\n네트워크 상황에 따라 최대 수 초가 소요될 수 있습니다.',
+          sender: 'bot',
+          timestamp: new Date(),
+          kind: 'postnatalLoading'
+        }
+        setMessages(prev => {
+          const next = [...prev, loadingMsg]
+          persistMessages(next, activeSessionId)
+          return next
+        })
+
+        // 주소 기반 조회
         const fallbackSigun = (import.meta as any).env?.VITE_DEFAULT_SIGUN || '안산시'
         const sigun = extractSigunFromAddress(auth.address) || fallbackSigun
         const userLoc: Coordinates | null = await geocodeAddress(auth.address || '')
@@ -324,16 +340,11 @@ const ChatBot = () => {
             ranked = list
           }
         } catch (e) {
-          // 데이터 실패 시 안내 버블
-          const errMsg: Message = {
-            id: (Date.now() + 3).toString(),
-            text: '죄송합니다. 산후조리원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
-            sender: 'bot',
-            timestamp: new Date(),
-            kind: 'text'
-          }
+          // 데이터 실패: 로딩 버블을 에러 텍스트로 교체
           setMessages(prev => {
-            const next = [...prev, errMsg]
+            const next = prev.map(m => m.id === loadingId
+              ? { ...m, kind: 'text', text: '죄송합니다. 산후조리원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }
+              : m)
             persistMessages(next, activeSessionId)
             return next
           })
@@ -357,16 +368,11 @@ const ChatBot = () => {
             return next
           })
         }
-        const blockMsg: Message = {
-          id: (Date.now() + 4).toString(),
-          text: '',
-          sender: 'bot',
-          timestamp: new Date(),
-          kind: 'postnatalCards',
-          payload: { sigun, items: topN }
-        }
+        // 로딩 버블을 결과 카드로 교체
         setMessages(prev => {
-          const next = [...prev, blockMsg]
+          const next = prev.map(m => m.id === loadingId
+            ? { ...m, text: '', kind: 'postnatalCards', payload: { sigun, items: topN } as any }
+            : m)
           persistMessages(next, activeSessionId)
           return next
         })
@@ -599,6 +605,21 @@ const ChatBot = () => {
                         >
                           로그인 하러 가기
                         </Link>
+                      </div>
+                    )}
+
+                    {message.kind === 'postnatalLoading' && (
+                      <div className="bg-gray-100 text-gray-800 p-4 rounded-2xl w-full">
+                        <p className="text-sm mb-3">{renderTextWithBasicMarkdown(message.text)}</p>
+                        <div className="animate-pulse space-y-3">
+                          {[0,1,2].map(i => (
+                            <div key={i} className="rounded-lg border border-gray-200 bg-white p-3">
+                              <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                              <div className="h-3 bg-gray-200 rounded w-1/2 mt-2"></div>
+                              <div className="h-3 bg-gray-200 rounded w-1/3 mt-1"></div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
