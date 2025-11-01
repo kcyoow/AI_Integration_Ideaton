@@ -213,8 +213,16 @@ const ChatBot = () => {
     ;(async () => {
       let assembled = ''
       try {
+        let started = false
         for await (const event of streamChat(history)) {
           if (currentSessionRef.current !== activeSessionId) break
+          if (!started) {
+            started = true
+            if (currentSessionRef.current === activeSessionId) {
+              setIsTyping(false)
+              setTypingSessionId(null)
+            }
+          }
           if (event.type === 'token') {
             assembled += event.content
           } else if (event.type === 'message') {
@@ -273,6 +281,32 @@ const ChatBot = () => {
       minute: '2-digit',
       hour12: false
     })
+  }
+
+  // 간단한 마크다운(**굵게**)과 줄바꿈 렌더링
+  const renderTextWithBasicMarkdown = (text: string) => {
+    const lines = text.split('\n')
+    let keySeq = 0
+    const renderInline = (line: string) => {
+      const nodes: (string | JSX.Element)[] = []
+      const pattern = /\*\*(.+?)\*\*/g
+      let lastIdx = 0
+      let match: RegExpExecArray | null
+      while ((match = pattern.exec(line)) !== null) {
+        const start = match.index
+        const end = start + match[0].length
+        if (start > lastIdx) nodes.push(line.slice(lastIdx, start))
+        nodes.push(<strong key={`b-${keySeq++}`}>{match[1]}</strong>)
+        lastIdx = end
+      }
+      if (lastIdx < line.length) nodes.push(line.slice(lastIdx))
+      return nodes
+    }
+    return lines.flatMap((line, i) => (
+      i < lines.length - 1
+        ? [...renderInline(line), <br key={`br-${keySeq++}`} />]
+        : renderInline(line)
+    ))
   }
 
   return (
@@ -377,7 +411,7 @@ const ChatBot = () => {
                         ? 'bg-primary-500 text-white'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      <p className="whitespace-pre-line text-sm">{message.text}</p>
+                      <p className="text-sm">{renderTextWithBasicMarkdown(message.text)}</p>
                     </div>
                     <div
                       className={`text-xs ${
@@ -455,7 +489,12 @@ const ChatBot = () => {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                onKeyDown={(e) => {
+                  // IME(한글) 조합 입력 중에는 Enter 이벤트를 무시하여 중복 전송 방지
+                  if (e.key === 'Enter' && !(e.nativeEvent as any).isComposing) {
+                    handleSendMessage()
+                  }
+                }}
                 placeholder="궁금한 점을 질문해주세요..."
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
