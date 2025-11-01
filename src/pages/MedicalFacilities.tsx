@@ -1,19 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { 
-  Search, 
-  MapPin, 
-  Phone, 
-  Clock, 
-  Star, 
+import {
+  Search,
+  MapPin,
+  Phone,
+  Clock,
+  Star,
   Building2,
   Pill,
   Stethoscope,
-  Navigation,
   Heart,
-  
+
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { loadNaverMap } from '../lib/naverMap'
 
 interface Facility {
   id: string
@@ -36,12 +38,58 @@ const MedicalFacilities = () => {
   const [selectedType, setSelectedType] = useState('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [userLocation, setUserLocation] = useState('안산시 상록구')
+  const [mapReady, setMapReady] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
+  const [addressQuery, setAddressQuery] = useState('')
+  const [addressResults, setAddressResults] = useState<any[]>([])
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false)
+  const [addressError, setAddressError] = useState<string | null>(null)
+  const mapElementRef = useRef<HTMLDivElement | null>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
+  const searchMarkerRef = useRef<any>(null)
+  const mapSectionRef = useRef<HTMLDivElement | null>(null)
+
+  const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_MAP_CLIENT_ID
+  const DEFAULT_CENTER = { lat: 37.321877, lng: 126.830883 }
 
   useEffect(() => {
     if (auth.address) {
-      setUserLocation(prev => (prev === '' || prev === '안산시 상록구') ? auth.address : prev)
+      const addr: string = String(auth.address)
+      setUserLocation(prev => (prev === '' || prev === '안산시 상록구') ? addr : prev)
     }
   }, [auth.address])
+
+  useEffect(() => {
+    if (!mapElementRef.current) return
+    if (!NAVER_CLIENT_ID) {
+      setMapError('네이버 지도 Client ID가 설정되지 않았습니다.')
+      return
+    }
+
+    loadNaverMap(NAVER_CLIENT_ID)
+      .then(() => {
+        if (!mapElementRef.current || !window.naver) return
+
+        const center = new window.naver.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
+        mapInstanceRef.current = new window.naver.maps.Map(mapElementRef.current, {
+          center,
+          zoom: 16,
+          minZoom: 8,
+          zoomControl: true,
+          zoomControlOptions: {
+            position: window.naver.maps.Position.RIGHT_CENTER
+          }
+        })
+
+        setMapReady(true)
+      })
+      .catch((error) => {
+        console.error(error)
+        setMapError(error instanceof Error ? error.message : '지도를 불러오지 못했습니다. 설정을 확인해주세요.')
+      })
+  }, [NAVER_CLIENT_ID])
 
   const facilities: Facility[] = [
     {
@@ -129,12 +177,187 @@ const MedicalFacilities = () => {
 
   const filteredFacilities = facilities.filter(facility => {
     const matchesSearch = facility.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         facility.address.toLowerCase().includes(searchTerm.toLowerCase())
+      facility.address.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = selectedType === 'all' || facility.type === selectedType
     const matchesCategory = selectedCategory === 'all' || facility.category === selectedCategory
-    
+
     return matchesSearch && matchesType && matchesCategory
   })
+
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || !window.naver) return
+
+    markersRef.current.forEach(marker => marker.setMap(null))
+    markersRef.current = []
+
+    if (searchMarkerRef.current) {
+      const markerPosition = searchMarkerRef.current.getPosition()
+      if (markerPosition) {
+        mapInstanceRef.current.setCenter(markerPosition)
+      }
+    } else {
+      const center = new window.naver.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
+      mapInstanceRef.current.setCenter(center)
+      mapInstanceRef.current.setZoom(16)
+    }
+  }, [filteredFacilities, mapReady])
+
+  // 로그인 상태라면, 회원가입 시 입력한 주소를 기본 중심으로 이동
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || !window.naver) return
+    if (!auth.userId || !auth.address) return
+
+    const query = String(auth.address)
+    if (!query.trim()) return
+
+    window.naver.maps.Service.geocode({ query }, (status: any, response: any) => {
+      if (status !== window.naver.maps.Service.Status.OK) return
+      const addr = response?.v2?.addresses?.[0]
+      if (!addr) return
+      const lat = parseFloat(addr.y)
+      const lng = parseFloat(addr.x)
+      if (Number.isNaN(lat) || Number.isNaN(lng)) return
+
+      const position = new window.naver.maps.LatLng(lat, lng)
+      const targetZoom = 16
+      if (typeof mapInstanceRef.current.morph === 'function') {
+        mapInstanceRef.current.morph(position, targetZoom, { duration: 400 })
+      } else {
+        mapInstanceRef.current.setCenter(position)
+        mapInstanceRef.current.setZoom(targetZoom)
+      }
+
+      // 기본 위치 마커 설정 (검색 마커와 동일 레퍼런스 사용)
+      const markerIcon = {
+        content: [
+          '<div style="position: relative; width: 28px; height: 28px; transform: translate(-50%, -90%);">',
+          '  <div style="width: 18px; height: 18px; margin: 0 auto; background-color: #2563eb; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.25);"></div>',
+          '  <div style="position: absolute; left: 50%; top: 14px; width: 0; height: 0; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #2563eb;"></div>',
+          '</div>'
+        ].join(''),
+        anchor: new window.naver.maps.Point(14, 28)
+      }
+
+      if (!searchMarkerRef.current) {
+        searchMarkerRef.current = new window.naver.maps.Marker({
+          position,
+          map: mapInstanceRef.current,
+          icon: markerIcon
+        })
+      } else {
+        searchMarkerRef.current.setPosition(position)
+        searchMarkerRef.current.setIcon(markerIcon)
+        searchMarkerRef.current.setMap(mapInstanceRef.current)
+      }
+
+      // 표시용 현재 위치 텍스트도 동기화
+      setUserLocation(addr.roadAddress || addr.jibunAddress || query)
+    })
+  }, [auth.userId, auth.address, mapReady])
+
+  const openAddressModal = () => {
+    setAddressQuery('')
+    setAddressResults([])
+    setAddressError(null)
+    setIsAddressModalOpen(true)
+  }
+
+  const closeAddressModal = () => {
+    if (isSearchingAddress) return
+    setIsAddressModalOpen(false)
+    setAddressResults([])
+    setAddressError(null)
+  }
+
+  const searchAddress = async (event?: FormEvent<HTMLFormElement>) => {
+    if (event) event.preventDefault()
+    if (!mapReady || !window.naver) return
+
+    const query = addressQuery.trim()
+    if (!query) {
+      setAddressError('주소를 입력해주세요.')
+      setAddressResults([])
+      return
+    }
+
+    setIsSearchingAddress(true)
+    setAddressError(null)
+
+    window.naver.maps.Service.geocode({ query }, (status: any, response: any) => {
+      setIsSearchingAddress(false)
+
+      if (status !== window.naver.maps.Service.Status.OK) {
+        setAddressError('검색 결과가 없습니다. 다른 주소로 시도해보세요.')
+        setAddressResults([])
+        return
+      }
+
+      const results = response?.v2?.addresses ?? []
+      if (!results.length) {
+        setAddressError('검색 결과가 없습니다. 다른 주소로 시도해보세요.')
+        setAddressResults([])
+        return
+      }
+
+      setAddressResults(results)
+    })
+  }
+
+  const moveToAddress = (address: any) => {
+    if (!mapInstanceRef.current || !window.naver) return
+
+    const lat = parseFloat(address.y)
+    const lng = parseFloat(address.x)
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      setAddressError('좌표 정보를 확인할 수 없습니다.')
+      return
+    }
+
+    const position = new window.naver.maps.LatLng(lat, lng)
+    const currentZoom = typeof mapInstanceRef.current.getZoom === 'function'
+      ? mapInstanceRef.current.getZoom()
+      : 16
+
+    if (typeof mapInstanceRef.current.morph === 'function') {
+      mapInstanceRef.current.morph(position, currentZoom, { duration: 400 })
+    } else {
+      mapInstanceRef.current.setCenter(position)
+      mapInstanceRef.current.setZoom(currentZoom)
+    }
+
+    const markerIcon = {
+      content: [
+        '<div style="position: relative; width: 28px; height: 28px; transform: translate(-50%, -90%);">',
+        '  <div style="width: 18px; height: 18px; margin: 0 auto; background-color: #ef4444; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.25);"></div>',
+        '  <div style="position: absolute; left: 50%; top: 14px; width: 0; height: 0; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #ef4444;"></div>',
+        '</div>'
+      ].join(''),
+      anchor: new window.naver.maps.Point(14, 28)
+    }
+
+    if (!searchMarkerRef.current) {
+      searchMarkerRef.current = new window.naver.maps.Marker({
+        position,
+        map: mapInstanceRef.current,
+        icon: markerIcon
+      })
+    } else {
+      searchMarkerRef.current.setPosition(position)
+      searchMarkerRef.current.setIcon(markerIcon)
+      searchMarkerRef.current.setMap(mapInstanceRef.current)
+    }
+
+    const formattedAddress = address.roadAddress || address.jibunAddress || addressQuery
+    setUserLocation(formattedAddress)
+
+    if (typeof window !== 'undefined' && mapSectionRef.current) {
+      const rect = mapSectionRef.current.getBoundingClientRect()
+      const target = window.scrollY + rect.top - 120
+      window.scrollTo({ top: target < 0 ? 0 : target, behavior: 'smooth' })
+    }
+
+    setIsAddressModalOpen(false)
+  }
 
   const getFacilityIcon = (type: string) => {
     switch (type) {
@@ -158,9 +381,8 @@ const MedicalFacilities = () => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
-        className={`h-4 w-4 ${
-          i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-        }`}
+        className={`h-4 w-4 ${i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+          }`}
       />
     ))
   }
@@ -213,16 +435,17 @@ const MedicalFacilities = () => {
               <input
                 type="text"
                 value={userLocation}
-                onChange={(e) => setUserLocation(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                readOnly
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 transition={{ type: 'tween', duration: 0.15 }}
+                onClick={openAddressModal}
                 className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors duration-150"
               >
-                <Navigation className="h-4 w-4" />
+                검색
               </motion.button>
             </div>
           </div>
@@ -241,11 +464,10 @@ const MedicalFacilities = () => {
                       whileTap={{ scale: 0.95 }}
                       transition={{ type: 'tween', duration: 0.15 }}
                       onClick={() => setSelectedType(type.id)}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-150 ${
-                        selectedType === type.id
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-150 ${selectedType === type.id
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                     >
                       <Icon className="h-4 w-4" />
                       <span>{type.name}</span>
@@ -265,11 +487,10 @@ const MedicalFacilities = () => {
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: 'tween', duration: 0.15 }}
                     onClick={() => setSelectedCategory(category === '전체' ? 'all' : category)}
-                    className={`px-4 py-2 rounded-lg transition-colors duration-150 ${
-                      (category === '전체' && selectedCategory === 'all') || selectedCategory === category
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={`px-4 py-2 rounded-lg transition-colors duration-150 ${(category === '전체' && selectedCategory === 'all') || selectedCategory === category
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                   >
                     {category}
                   </motion.button>
@@ -319,12 +540,12 @@ const MedicalFacilities = () => {
                   <span>{facility.address}</span>
                   <span className="text-primary-600 font-medium">({facility.distance})</span>
                 </div>
-                
+
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Phone className="h-4 w-4 text-primary-500" />
                   <span>{facility.phone}</span>
                 </div>
-                
+
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Clock className="h-4 w-4 text-primary-500" />
                   <span>{facility.hours}</span>
@@ -386,27 +607,88 @@ const MedicalFacilities = () => {
           </motion.div>
         )}
 
-        {/* Map Placeholder */}
+        {/* Map Section */}
         <motion.div
+          ref={mapSectionRef}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
           className="mt-8 bg-white rounded-xl shadow-lg p-6"
         >
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">지도에서 보기</h2>
-          <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-            <div className="text-center">
-              <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">
-                실제 지도 서비스는 API 연동 시 구현 가능합니다
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                현재는 목업 형태로 제공됩니다
-              </p>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">지도에서 보기</h2>
           </div>
+          {mapError ? (
+            <div className="bg-red-50 text-red-600 rounded-lg p-4 text-sm">
+              {mapError}
+            </div>
+          ) : (
+            <div
+              ref={mapElementRef}
+              className="mx-auto w-full h-[22rem] sm:h-[26rem] lg:h-[30rem] xl:h-[34rem] rounded-lg border border-gray-200"
+            />
+          )}
         </motion.div>
       </div>
+
+      {isAddressModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">주소 검색</h3>
+              <button
+                onClick={closeAddressModal}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-base font-medium text-gray-600 hover:bg-gray-200 transition-colors duration-150 disabled:opacity-60"
+                disabled={isSearchingAddress}
+              >
+                닫기
+              </button>
+            </div>
+
+            <form onSubmit={searchAddress} className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={addressQuery}
+                  onChange={(event) => setAddressQuery(event.target.value)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="예: 경기도 안산시 상록구 ..."
+                  disabled={isSearchingAddress}
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors duration-150 disabled:opacity-60"
+                  disabled={isSearchingAddress}
+                >
+                  {isSearchingAddress ? '검색 중...' : '검색'}
+                </button>
+              </div>
+            </form>
+
+            {addressError && (
+              <p className="text-sm text-red-600 mt-3">{addressError}</p>
+            )}
+
+            <div className="mt-4 max-h-60 overflow-y-auto space-y-2">
+              {addressResults.map((result, index) => (
+                <button
+                  key={`${result.x}-${result.y}-${index}`}
+                  onClick={() => moveToAddress(result)}
+                  className="w-full text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-primary-400 hover:bg-primary-50 transition-colors duration-150"
+                  disabled={isSearchingAddress}
+                >
+                  <p className="text-sm font-medium text-gray-900">{result.roadAddress || result.jibunAddress}</p>
+                  {result.jibunAddress && (
+                    <p className="text-xs text-gray-500 mt-1">지번: {result.jibunAddress}</p>
+                  )}
+                </button>
+              ))}
+
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

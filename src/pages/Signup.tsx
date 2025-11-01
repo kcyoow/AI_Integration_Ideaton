@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import type { FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { loadNaverMap } from '../lib/naverMap'
 
 const Signup = () => {
   const navigate = useNavigate()
@@ -18,6 +21,11 @@ const Signup = () => {
   })
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
+  const [addressQuery, setAddressQuery] = useState('')
+  const [addressResults, setAddressResults] = useState<any[]>([])
+  const [addressError, setAddressError] = useState<string | null>(null)
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false)
 
   const handleChange = (key: keyof typeof form, value: string | boolean) => {
     setForm(prev => ({
@@ -26,9 +34,15 @@ const Signup = () => {
     }))
   }
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
+
+    if (!form.address.trim()) {
+      setError('주소를 입력해주세요.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -50,6 +64,77 @@ const Signup = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const openAddressModal = () => {
+    setAddressQuery('')
+    setAddressResults([])
+    setAddressError(null)
+    setIsAddressModalOpen(true)
+  }
+
+  const closeAddressModal = () => {
+    if (isSearchingAddress) return
+    setIsAddressModalOpen(false)
+    setAddressResults([])
+    setAddressError(null)
+  }
+
+  const searchAddress = async (event?: FormEvent<HTMLFormElement>) => {
+    if (event) event.preventDefault()
+    const query = addressQuery.trim()
+    if (!query) {
+      setAddressError('주소를 입력해주세요.')
+      setAddressResults([])
+      return
+    }
+
+    setIsSearchingAddress(true)
+    setAddressError(null)
+
+    try {
+      await loadNaverMap(import.meta.env.VITE_NAVER_MAP_CLIENT_ID)
+    } catch (e) {
+      setIsSearchingAddress(false)
+      setAddressError('주소 검색을 초기화하지 못했습니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+
+    if (!window.naver || !window.naver.maps || !window.naver.maps.Service || !window.naver.maps.Service.geocode) {
+      setIsSearchingAddress(false)
+      setAddressError('주소 검색 모듈을 초기화하지 못했습니다. 새로고침 후 다시 시도해주세요.')
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsSearchingAddress(false)
+      setAddressError('주소 검색 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.')
+    }, 10000)
+
+    window.naver.maps.Service.geocode({ query }, (status: any, response: any) => {
+      window.clearTimeout(timeoutId)
+      setIsSearchingAddress(false)
+      if (status !== window.naver.maps.Service.Status.OK) {
+        setAddressError('검색 결과가 없습니다. 다른 주소로 시도해보세요.')
+        setAddressResults([])
+        return
+      }
+
+      const results = response?.v2?.addresses ?? []
+      if (!results.length) {
+        setAddressError('검색 결과가 없습니다. 다른 주소로 시도해보세요.')
+        setAddressResults([])
+        return
+      }
+
+      setAddressResults(results)
+    })
+  }
+
+  const selectAddress = (addr: any) => {
+    const formatted = addr.roadAddress || addr.jibunAddress || addressQuery
+    setForm(prev => ({ ...prev, address: formatted }))
+    setIsAddressModalOpen(false)
   }
 
   return (
@@ -110,14 +195,23 @@ const Signup = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">집 주소</label>
-            <input
-              type="text"
-              value={form.address}
-              onChange={(event) => handleChange('address', event.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              placeholder="예: 경기도 안산시 상록구 ..."
-              required
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={form.address}
+                readOnly
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="주소 검색을 눌러 입력하세요"
+                required
+              />
+              <button
+                type="button"
+                onClick={openAddressModal}
+                className="px-4 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors duration-150"
+              >
+                검색
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -186,9 +280,66 @@ const Signup = () => {
           </button>
         </form>
       </div>
+
+      {isAddressModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">검색</h3>
+              <button
+                onClick={closeAddressModal}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-base font-medium text-gray-600 hover:bg-gray-200 transition-colors duration-150 disabled:opacity-60"
+                disabled={isSearchingAddress}
+              >
+                닫기
+              </button>
+            </div>
+
+            <form onSubmit={searchAddress} className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={addressQuery}
+                  onChange={(event) => setAddressQuery(event.target.value)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="예: 경기도 안산시 상록구 ..."
+                  disabled={isSearchingAddress}
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors duration-150 disabled:opacity-60"
+                  disabled={isSearchingAddress}
+                >
+                  {isSearchingAddress ? '검색 중...' : '검색'}
+                </button>
+              </div>
+            </form>
+
+            {addressError && (
+              <p className="text-sm text-red-600 mt-3">{addressError}</p>
+            )}
+
+            <div className="mt-4 max-h-60 overflow-y-auto space-y-2">
+              {addressResults.map((result, index) => (
+                <button
+                  key={`${result.x}-${result.y}-${index}`}
+                  onClick={() => selectAddress(result)}
+                  className="w-full text-left border border-gray-200 rounded-xl px-4 py-3 hover:border-primary-400 hover:bg-primary-50 transition-colors duration-150"
+                  disabled={isSearchingAddress}
+                >
+                  <p className="text-sm font-medium text-gray-900">{result.roadAddress || result.jibunAddress}</p>
+                  {result.jibunAddress && (
+                    <p className="text-xs text-gray-500 mt-1">지번: {result.jibunAddress}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
 
 export default Signup
-
